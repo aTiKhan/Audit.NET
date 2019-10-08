@@ -14,75 +14,119 @@ using System.Linq;
 using Microsoft.AspNetCore.Http;
 using System.IO;
 using System.Text;
+using Microsoft.AspNetCore.Mvc.Abstractions;
+using System.Reflection;
+using Microsoft.AspNetCore.Http.Extensions;
 
 namespace Audit.WebApi
 {
-    internal class AuditApiAdapter
+    /// <summary>
+    /// Adapter for the action filters, only to be used for low-level customization
+    /// </summary>
+    public class AuditApiAdapter
     {
-        private const string AuditApiActionKey = "__private_AuditApiAction__";
-        private const string AuditApiScopeKey = "__private_AuditApiScope__";
-        
+        /// <summary>
+        /// Determines if a Web API action is ignored by attributes, and if it is ignored, discards the current audit scope.
+        /// </summary>
+        public bool ActionIgnored(ActionExecutingContext actionContext)
+        {
+            bool ignored = false;
+            var actionDescriptor = actionContext?.ActionDescriptor as ControllerActionDescriptor;
+            var controllerIgnored = actionDescriptor?.MethodInfo?.DeclaringType.GetTypeInfo().GetCustomAttribute<AuditIgnoreAttribute>(true);
+            if (controllerIgnored != null)
+            {
+                ignored = true;
+            }
+            else
+            {
+                var actionIgnored = actionDescriptor?.MethodInfo?.GetCustomAttribute<AuditIgnoreAttribute>(true);
+                if (actionIgnored != null)
+                {
+                    ignored = true;
+                }
+            }
+            if (ignored)
+            {
+                DiscardCurrentScope(actionContext.HttpContext);
+            }
+            return ignored;
+        }
+
         /// <summary>
         /// Occurs before the action method is invoked.
         /// </summary>
-        public async Task BeforeExecutingAsync(ActionExecutingContext actionContext,
+        internal async Task BeforeExecutingAsync(ActionExecutingContext actionContext,
             bool includeHeaders, bool includeRequestBody, bool serializeParams, string eventTypeName)
         {
             var httpContext = actionContext.HttpContext;
-            var actionDescriptior = actionContext.ActionDescriptor as ControllerActionDescriptor;
-            var auditAction = new AuditApiAction
-            {
-                UserName = httpContext.User?.Identity.Name,
-                IpAddress = httpContext.Connection?.RemoteIpAddress?.ToString(),
-                RequestUrl = string.Format("{0}://{1}{2}", httpContext.Request.Scheme, httpContext.Request.Host, httpContext.Request.Path),
-                HttpMethod = actionContext.HttpContext.Request.Method,
-                FormVariables = GetFormVariables(httpContext),
-                Headers = includeHeaders ? ToDictionary(httpContext.Request.Headers) : null,
-                ActionName = actionDescriptior != null ? actionDescriptior.ActionName : actionContext.ActionDescriptor.DisplayName,
-                ControllerName = actionDescriptior != null ? actionDescriptior.ControllerName : null,
-                ActionParameters = GetActionParameters(actionContext.ActionArguments, serializeParams),
-                RequestBody = new BodyContent { Type = httpContext.Request.ContentType, Length = httpContext.Request.ContentLength, Value = includeRequestBody ? GetRequestBody(actionContext) : null }
-            };
+            var actionDescriptor = actionContext.ActionDescriptor as ControllerActionDescriptor;
+
+            var auditAction = CreateOrUpdateAction(actionContext, includeHeaders, includeRequestBody, serializeParams, eventTypeName);
+
             var eventType = (eventTypeName ?? "{verb} {controller}/{action}").Replace("{verb}", auditAction.HttpMethod)
                 .Replace("{controller}", auditAction.ControllerName)
-                .Replace("{action}", auditAction.ActionName);
+                .Replace("{action}", auditAction.ActionName)
+                .Replace("{url}", auditAction.RequestUrl);
             // Create the audit scope
             var auditEventAction = new AuditEventWebApi()
             {
                 Action = auditAction
             };
-            var auditScope = await AuditScope.CreateAsync(new AuditScopeOptions() { EventType = eventType, AuditEvent = auditEventAction, CallingMethod = actionDescriptior.MethodInfo });
-            httpContext.Items[AuditApiActionKey] = auditAction;
-            httpContext.Items[AuditApiScopeKey] = auditScope;
+            var auditScope = await AuditScope.CreateAsync(new AuditScopeOptions() { EventType = eventType, AuditEvent = auditEventAction, CallingMethod = actionDescriptor.MethodInfo });
+            httpContext.Items[AuditApiHelper.AuditApiActionKey] = auditAction;
+            httpContext.Items[AuditApiHelper.AuditApiScopeKey] = auditScope;
         }
 
-        private IDictionary<string, string> GetFormVariables(HttpContext context)
+        private AuditApiAction CreateOrUpdateAction(ActionExecutingContext actionContext,
+            bool includeHeaders, bool includeRequestBody, bool serializeParams, string eventTypeName)
         {
-            if (!context.Request.HasFormContentType)
+            var httpContext = actionContext.HttpContext;
+            var actionDescriptor = actionContext.ActionDescriptor as ControllerActionDescriptor;
+            AuditApiAction action = null;
+            if (httpContext.Items.ContainsKey(AuditApiHelper.AuditApiActionKey))
             {
-                return null;
+                action = httpContext.Items[AuditApiHelper.AuditApiActionKey] as AuditApiAction;
             }
-            IFormCollection formCollection;
-            try
+            if (action == null)
             {
-                formCollection = context.Request.Form;
+                action = new AuditApiAction
+                {
+                    UserName = httpContext.User?.Identity.Name,
+                    IpAddress = httpContext.Connection?.RemoteIpAddress?.ToString(),
+                    HttpMethod = httpContext.Request.Method,
+                    FormVariables = AuditApiHelper.GetFormVariables(httpContext),
+                    TraceId = httpContext.TraceIdentifier
+                };
             }
-            catch (InvalidDataException)
+            action.RequestUrl = httpContext.Request.GetDisplayUrl();
+            action.ActionName = actionDescriptor != null ? actionDescriptor.ActionName : actionContext.ActionDescriptor.DisplayName;
+            action.ControllerName = actionDescriptor?.ControllerName;
+            action.ActionParameters = GetActionParameters(actionDescriptor, actionContext.ActionArguments, serializeParams);
+            if (includeHeaders)
             {
-                // InvalidDataException could be thrown if the form count exceeds the limit, etc
-                return null;
+                action.Headers = AuditApiHelper.ToDictionary(httpContext.Request.Headers);
             }
-            return ToDictionary(formCollection);
+            if (includeRequestBody && action.RequestBody == null)
+            {
+                action.RequestBody = new BodyContent
+                {
+                    Type = httpContext.Request.ContentType,
+                    Length = httpContext.Request.ContentLength,
+                    Value = AuditApiHelper.GetRequestBody(httpContext)
+                };
+            }
+            return action;
         }
+
 
         /// <summary>
         /// Occurs after the action method is invoked.
         /// </summary>
-        public async Task AfterExecutedAsync(ActionExecutedContext context, bool includeModelState, bool includeResponseBody)
+        internal async Task AfterExecutedAsync(ActionExecutedContext context, bool includeModelState, bool includeResponseBody, bool includeResponseHeaders)
         {
             var httpContext = context.HttpContext;
-            var auditAction = httpContext.Items[AuditApiActionKey] as AuditApiAction;
-            var auditScope = httpContext.Items[AuditApiScopeKey] as AuditScope;
+            var auditAction = httpContext.Items[AuditApiHelper.AuditApiActionKey] as AuditApiAction;
+            var auditScope = httpContext.Items[AuditApiHelper.AuditApiScopeKey] as AuditScope;
             if (auditAction != null && auditScope != null)
             {
                 auditAction.Exception = context.Exception.GetExceptionInfo();
@@ -93,14 +137,16 @@ namespace Audit.WebApi
                     var statusCode = context.Result is ObjectResult && (context.Result as ObjectResult).StatusCode.HasValue ? (context.Result as ObjectResult).StatusCode.Value
                         : context.Result is StatusCodeResult ? (context.Result as StatusCodeResult).StatusCode : context.HttpContext.Response.StatusCode;
                     auditAction.ResponseStatusCode = statusCode;
-                    auditAction.ResponseStatus = GetStatusCodeString(auditAction.ResponseStatusCode);
+                    auditAction.ResponseStatus = AuditApiHelper.GetStatusCodeString(auditAction.ResponseStatusCode);
                     if (includeResponseBody)
                     {
-                        var bodyType = context.Result?.GetType().GetFullTypeName();
-                        if (bodyType != null)
-                        {
-                            auditAction.ResponseBody = new BodyContent { Type = bodyType, Value = GetResponseBody(context.Result) };
-                        }
+                        var bodyType = context.Result.GetType().GetFullTypeName();
+                        auditAction.ResponseBody = new BodyContent { Type = bodyType, Value = GetResponseBody(context.Result) };
+                    }
+
+                    if (includeResponseHeaders)
+                    {
+                        auditAction.ResponseHeaders = AuditApiHelper.ToDictionary(httpContext.Response.Headers);
                     }
                 }
                 else
@@ -108,9 +154,14 @@ namespace Audit.WebApi
                     auditAction.ResponseStatusCode = 500;
                     auditAction.ResponseStatus = "Internal Server Error";
                 }
-                // Replace the Action field and save
+                
+                // Replace the Action field 
                 (auditScope.Event as AuditEventWebApi).Action = auditAction;
-                await auditScope.SaveAsync();
+                // Save, if action was not created by middleware
+                if (!auditAction.IsMiddleware)
+                {
+                    await auditScope.SaveAsync();
+                }
             }
         }
 
@@ -177,64 +228,41 @@ namespace Audit.WebApi
             return result.ToString();
         }
 
-        private string GetStatusCodeString(int statusCode)
+        private IDictionary<string, object> GetActionParameters(ControllerActionDescriptor actionDescriptor, IDictionary<string, object> actionArguments, bool serializeParams)
         {
-            var name = ((HttpStatusCode)statusCode).ToString();
-            string[] words = Regex.Matches(name, "(^[a-z]+|[A-Z]+(?![a-z])|[A-Z][a-z]+)")
-                .OfType<Match>()
-                .Select(m => m.Value)
-                .ToArray();
-            return words.Length == 0 ? name : string.Join(" ", words);
-        }
-
-        private IDictionary<string, object> GetActionParameters(IDictionary<string, object> actionArguments, bool serializeParams)
-        {
+            var args = actionArguments.ToDictionary(k => k.Key, v => v.Value); 
+            foreach (var param in actionDescriptor.Parameters)
+            {
+                var paramDescriptor = param as ControllerParameterDescriptor;
+                if (paramDescriptor?.ParameterInfo.GetCustomAttribute<AuditIgnoreAttribute>(true) != null)
+                {
+                    args.Remove(param.Name);
+                }
+                else if (paramDescriptor?.ParameterInfo.GetCustomAttribute<FromServicesAttribute>(true) != null)
+                {
+                    args.Remove(param.Name);
+                }
+            }
             if (serializeParams)
             {
-                return AuditApiHelper.SerializeParameters(actionArguments);
+                return AuditApiHelper.SerializeParameters(args);
             }
-            return actionArguments;
-        }
-
-        private static IDictionary<string, string> ToDictionary(IEnumerable<KeyValuePair<string, StringValues>> col)
-        {
-            if (col == null)
-            {
-                return null;
-            }
-            IDictionary<string, string> dict = new Dictionary<string, string>();
-            foreach (var k in col)
-            {
-                dict.Add(k.Key, string.Join(", ", k.Value));
-            }
-            return dict;
+            return args;
         }
 
         internal static AuditScope GetCurrentScope(HttpContext httpContext)
         {
-            return httpContext.Items[AuditApiScopeKey] as AuditScope;
+            return httpContext.Items[AuditApiHelper.AuditApiScopeKey] as AuditScope;
         }
 
-        private string GetRequestBody(ActionExecutingContext actionContext)
+        internal static void DiscardCurrentScope(HttpContext httpContext)
         {
-            var body = actionContext.HttpContext.Request.Body;
-            if (body != null && body.CanRead)
+            var scope = GetCurrentScope(httpContext);
+            if (scope != null)
             {
-                using (var stream = new MemoryStream())
-                {
-                    if (body.CanSeek)
-                    {
-                        body.Seek(0, SeekOrigin.Begin);
-                    }
-                    body.CopyTo(stream);
-                    if (body.CanSeek)
-                    {
-                        body.Seek(0, SeekOrigin.Begin);
-                    }
-                    return Encoding.UTF8.GetString(stream.ToArray());
-                }
+                scope.Discard();
+                httpContext.Items[AuditApiHelper.AuditApiScopeKey] = null;
             }
-            return null;
         }
 
     }

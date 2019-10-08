@@ -58,10 +58,29 @@ namespace Audit.MongoDB.Providers
         /// </summary>
         public JsonSerializerSettings JsonSerializerSettings { get; set; } = new JsonSerializerSettings() { ReferenceLoopHandling = ReferenceLoopHandling.Ignore, Converters = new List<JsonConverter>() { new JavaScriptDateTimeConverter() } };
 
+        public MongoDataProvider()
+        {
+        }
+
+        public MongoDataProvider(Action<ConfigurationApi.IMongoProviderConfigurator> config)
+        {
+            var mongoConfig = new ConfigurationApi.MongoProviderConfigurator();
+            if (config != null)
+            {
+                config.Invoke(mongoConfig);
+                Collection = mongoConfig._collection;
+                ConnectionString = mongoConfig._connectionString;
+                Database = mongoConfig._database;
+                JsonSerializerSettings = mongoConfig._jsonSerializerSettings;
+            }
+        }
+
         private static void ConfigureBsonMapping()
         {
-            var pack = new ConventionPack();
-            pack.Add(new IgnoreIfNullConvention(true));
+            var pack = new ConventionPack
+            {
+                new IgnoreIfNullConvention(true)
+            };
             ConventionRegistry.Register("Ignore null properties for AuditEvent", pack, type => type == typeof(AuditEvent));
 
             BsonClassMap.RegisterClassMap<AuditTarget>(cm =>
@@ -169,7 +188,7 @@ namespace Audit.MongoDB.Providers
             {
                 return null;
             }
-            return JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(value, JsonSerializerSettings));
+            return JsonConvert.DeserializeObject(JsonConvert.SerializeObject(value, JsonSerializerSettings), value.GetType(), JsonSerializerSettings);
         }
 
         private void TestConnection()

@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using System.Threading;
 using Audit.Core;
 using Audit.EntityFramework.ConfigurationApi;
-#if NETSTANDARD1_5 || NETSTANDARD2_0 || NET461
+#if NETSTANDARD1_5 || NETSTANDARD2_0 || NETSTANDARD2_1 || NET461
 using Microsoft.EntityFrameworkCore;
 #elif NET45
 using System.Data.Common;
@@ -23,7 +23,7 @@ namespace Audit.EntityFramework
     {
         private DbContextHelper _helper = new DbContextHelper();
 
-#if NETSTANDARD1_5 || NETSTANDARD2_0 || NET461
+#if NETSTANDARD1_5 || NETSTANDARD2_0 || NETSTANDARD2_1 || NET461
         /// <summary>
         /// Initializes a new instance of the <see cref="AuditDbContext" /> class.
         /// </summary>
@@ -83,6 +83,7 @@ namespace Audit.EntityFramework
         {
             _helper.SetConfig(this);
         }
+
 #region Properties
         /// <summary>
         /// To indicate the event type to use on the audit event. (Default is the context name). 
@@ -104,6 +105,11 @@ namespace Audit.EntityFramework
         public virtual bool IncludeEntityObjects { get; set; }
 
         /// <summary>
+        /// To indicate if the entity validations should be avoided and excluded from the audit output. (Default is false)
+        /// </summary>
+        public virtual bool ExcludeValidationResults { get; set; }
+
+        /// <summary>
         /// To indicate the audit operation mode. (Default is OptOut). 
         ///  - OptOut: All the entities are tracked by default, except those decorated with the AuditIgnore attribute. 
         ///  - OptIn: No entity is tracked by default, except those decorated with the AuditInclude attribute.
@@ -119,6 +125,11 @@ namespace Audit.EntityFramework
         /// Optional custom fields added to the audit event
         /// </summary>
         public Dictionary<string, object> ExtraFields { get; } = new Dictionary<string, object>();
+
+        /// <summary>
+        /// To indicate if the Transaction Id retrieval should be ignored. If set to <c>true</c> the Transations Id will not be included on the output.
+        /// </summary>
+        public bool ExcludeTransactionId { get; set; }
 
         public DbContext DbContext { get { return this; } }
 #if NET45

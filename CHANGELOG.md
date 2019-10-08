@@ -3,10 +3,253 @@ All notable changes to Audit.NET and its extensions will be documented in this f
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [14.6.5] - 2019-09-26
+### Modified
+- Audit.NET.MongoDB: Updating MongoDB.Driver library to latest release (2.9.1). This fixes problem when using mongo DB data provider in Net Core 3.0 (#246).
+
+## [14.6.4] - 2019-09-21
+### Modified
+- Audit.EntityFramework: Adding ExcludeValidationResults setting to allow excluding entity validations on the audit output.
+
+## [14.6.3] - 2019-08-12
+### Modified
+- Audit.SqlServer: Adding boolean configuration value (SetDatabaseInitializerNull) to specify if the initializer should be set to NULL on the constructor of the internal DbContext. Only for .NET Framework (#237)
+
+## [14.6.2] - 2019-08-03
+### Modified
+- Audit.EntityFramework: EntityFramework Data Provider support to map a single entity to multiple audit entities.
+
+## [14.6.1] - 2019-08-03
+### Modified
+- Audit.SqlServer: Adding NET Core 3 preview support (#234)
+
+## [14.6.0] - 2019-07-26
+### Modified
+- Audit.EntityFramework.Core: Adding EF Core 3 support (#231)
+
+## [14.5.7] - 2019-07-18
+### Modified
+- Audit.WebApi and Audit.WebApi.Core: Changed the default order on `AuditApiAttribute` and `AuditApiGlobalFilter` to be `int.MinValue` instead of `0`. 
+This allows using `this.GetCurrentAuditScope()` on Controller overrides `OnActionExecutionAsync` and `OnActionExecuting` (#230)
+
+## [14.5.6] - 2019-07-09
+### Modified
+- All: Changed nuget package <ProjectUrl> to point to the base Audit.NET repository, so it can be uploaded to GitHub packages
+- Audit.WebApi: Fix null reference exception when response is null and response headers are included (#229)
+
+## [14.5.5] - 2019-07-01
+### Modified
+- Audit.NET: Added `ISystemClock` interface to allow testing code that depends on `DateTime.UtcNow`, such as event start-date, end-date and duration. Added `Audit.Core.Configuration.SystemClock` static configuration  property.
+
+## [14.5.4] - 2019-06-17
+### Modified
+- Audit.NET.PostgreSql: Fix IdColumnName missing quotes (#226)
+
+## [14.5.3] - 2019-06-05
+### Modified
+- Audit.NET.SqlServer: Update Microsoft.EntityFrameworkCore reference and remove SqlServer.Design reference for netstandard2.0. (#225)
+
+## [14.5.2] - 2019-05-30
+### Added
+- Audit.NET.NLog: New extension library to store the audit events using NLog™.
+
+## [14.5.1] - 2019-05-28
+### Modified
+- Audit.EntityFramework: Update Microsoft.EntityFrameworkCore to 2.2.4. Fixed issue with non-concurrent collections in concurrent integration
+
+## [14.5.0] - 2019-05-24
+### Modified
+- Audit.WebApi / Audit.WebApi.Core: Allowing the use of `[AuditIgnoreAttribute]` on controllers/action methods when using the Middleware or a mixed approach (Middleware+ActionFilter). (#218)
+
+## [14.4.0] - 2019-05-21
+### Added
+- Audit.HttpClient: New extension library to audit client calls to REST services when using `HttpClient`.
+
+## [14.3.4] - 2019-05-13
+### Added
+- Audit.Mvc and Audit.Mvc.Core: Added `AuditIngoreAttribute` to allow ignoring controllers, actions and/or parameters on the MVC audit output.
+
+## [14.3.3] - 2019-05-09
+### Modified
+- Upgrade newtonsoft.json references to latest version (12.0.2)
+
+## [14.3.2] - 2019-04-30
+### Modified
+- Audit.EntityFramework and Audit.EntityFramework.Core: Adding constructor to the EF Data Provider that allows fluent API configuration.
+
+## [14.3.1] - 2019-04-27
+### Modified
+- Audit.EntityFramework and Audit.EntityFramework.Core: Adding `ExcludeTransactionId` setting to allow avoiding the retrieval of the contextual transaction id for the audit events.
+
+## [14.3.0] - 2019-04-24
+### Modified
+- Audit.EntityFramework and Audit.EntityFramework.Core: Fix compatibility issue with EF Core's Proxied Lazy Loading (Microsoft.EntityFrameworkCore.Proxies) (#214).
+
+## [14.2.3] - 2019-04-17
+### Modified
+- Audit.WebApi and Audit.WebApi.Core: Ignoring action parameters marked with `[FromServicesAttribute]` (#213).
+
+## [14.2.2] - 2019-04-10
+### Added
+- Audit.NET.PostgreSql: Adding ability to configure extra columns on the audit SQL table with `CustomColumn` fluent API.
+
+## [14.2.1] - 2019-04-05
+### Added
+- Audit.NET: Adding ability to re-assign the AuditEvent's Target object after the scope is created.
+
+## [14.2.0] - 2019-03-16
+### Added
+- Audit.NET.SqlServer: Adding ability to configure extra columns on the audit SQL table with `CustomColumn` fluent API, and making JsonColumn optional.
+
+## [14.1.1] - 2019-03-07
+### Modified
+- Audit.EntityFramework: Fix race condition on EntityKeyHelper when obtaining the column names (#208)
+
+## [14.1.0] - 2019-02-11
+### Added
+- Audit.NET.AzureStorage: Added Azure Active Directory Authentication support via Access Token for the BLOB storage Data Provider.
+
+## [14.0.4] - 2019-01-31
+### Modified
+- Audit.EntityFramework: Fixed #198, adding validation to avoid exception when multiple mapping fragments are found.
+
+## [14.0.3] - 2019-01-21
+### Added
+- Audit.AzureStorage: Added constructor overloads to `AzureTableDataProvider` and `AzureBlobDataProvider` that accepts a fluent configuration. Useful for custom providers inheriting from those classes.
+
+## [14.0.2] - 2018-12-15
+### Added
+- Audit.WebApi and Audit.WebApi.Core: Added Response Headers to the event output (optional by `IncludeResponseHeaders` configuration, default is _false_). 
+- Audit.Core: Added optional Custom Fields to `AuditEvent.Environment`.
+
+## [14.0.1] - 2018-11-28
+### Added
+- Audit.EntityFramework and Audit.EntityFramework.Core: Added Schema property on entries to complement table name (#182).
+Added optional Custom Fields to Entity Framework Event and Event.Entries.
+- Audit.NET.MySql: Changed target frameworks to match those on MySqlConnector nuget version 0.47.1.
+
+## [14.0.0] - 2018-11-19
+### Modified
+- Audit.Core: UTC standarization for dates: changing missing dates to be UTC (Event.StartDate, Event.EndDate).
+- Audit.Core: Added `Configuration.Setup().Use()` shortcut method for `UseCustomProvider()` and `UseDynamicProvider()`.
+
+## [13.3.0] - 2018-11-16
+### Modified
+- Audit.Core: Adding support to Xamarin/Mono. Fix incompatible calls to `System.Runtime.InteropServices.Marshal`. (#180)
+
+## [13.2.2] - 2018-11-15
+### Modified
+- Audit.EntityFramework.Core: Fix bug when auditing tables with composite multiple froeign keys related to the same column (#178).
+
+## [13.2.1] - 2018-11-12
+### Modified
+- Audit.EntityFramework and Audit.EntityFramework.Core: Fix parameter default for `IgnoreMatchedProperties(bool)` on configuration API to be _true_.
+
+
+## [13.2.0] - 2018-10-31
+### Modified
+- Audit.EntityFramework and Audit.EntityFramework.Core: Allow mapping multiple entity types to the same audit type with independent actions. (#175)
+
+## [13.1.5] - 2018-10-30
+### Modified
+- Audit.PostgreSQL: Fix casing for schema name, allowing case-sensitive schemas. (#174)
+
+## [13.1.4] - 2018-10-25
+### Modified
+- Audit.MongoDB: Fix bug when deserializing custom fields (#173)
+
+## [13.1.3] - 2018-10-17
+### Modified
+- Audit.WebApi and Audit.Mvc: Upgrading AspNetCore libraries from GitHub suggestion because of security vulnerability.
+- Audit.AzureDocumentDB: Adding netstandard2.0 as target
+
+## [13.1.2] - 2018-09-12
+### Modified
+- Audit.WebApi.Core: (#158) Moving `GetAuditScope` extension method to `ControllerBase` instead of `Controller`.
+- Audit.Template.WebApi and Audit.Template Mvc: Using the built-in extension for registering a IHttpContextAccessor (#160)
+- Audit.WebApi.Core: (Fix bug #161) Empty http response when using IncludeResponseBody on both the middleware and the audit filter.
+
+## [13.1.1] - 2018-09-10
+### Modified
+- Audit.WebApi / Audit.WebApi.Core: Have request/response bodies retrieval mutually exclusive between ActionFilter and MiddleWare.
+- Audit.WebApi.Template: Adding middleware to webapi default template. 
+
+## [13.1.0] - 2018-09-10
+### Added
+- Audit.WebApi / Audit.WebApi.Core: Added new middleware to complement the action filter audits and be able to log any request regardless
+if an action is reached or not.
+
+
+## [13.0.0] - 2018-08-30
+### Modified
+- Audit.EntityFramework and Audit.EntityFramework.Core: Created new nuget packages `Audit.EntityFramework.Identity` and `Audit.EntityFramework.Identity.Core` 
+to remove the AspNet.Identity dependency.
+
+
+## [12.3.6] - 2018-08-29
+### Added
+- Audit.NET.DynamoDB: Adding new extension **Audit.NET.DynamoDB** to save audit events into Amazon DynamoDB using the `AWSSDK.DynamoDBv2` document model.
+
+### Modified
+- Audit.Core: Adding GetXxxxxEvent() extensions to AuditScope in addition to the AuditEvent.
+- Audit.EntityFramework: Added validation on EF Data Provider to ignore non EF events.
+
+## [12.3.5] - 2018-08-22
+### Modified
+- Audit.EntityFramework: Fix #150: Race condition on Audit.EF .NET Framework version, when multiple threads are calling EF SaveChanges. 
+
+
+## [12.3.4] - 2018-08-21
+### Modified
+- Audit.EntityFramework and Audit.EntityFramework.Core: Allow setting up a different DbContext for storing the audit events on the EF Data Provider. Related to #148.
+
+
+## [12.3.3] - 2018-08-21
+### Modified
+- Audit.WebApi: Fix bug #147 for Microsoft.AspNet.WebApi.Versioning package compatibility.
+
+## [12.3.2] - 2018-08-20
+### Modified
+- Audit.EntityFramework.Core: Replace Microsoft.EntityFrameworkCore.SqlServer dependency in Audit.EntityFramework.Core with Microsoft.EntityFrameworkCore.Relational. (thanks to https://github.com/Deilan).
+
+
+## [12.3.1] - 2018-08-20
+### Modified
+- Audit.WebApi: Fix bug #146 on IsActionIgnored for .NET framework WebApi.
+
+
+## [12.3.0] - 2018-08-20
+### Modified
+- Audit.Core: Changing the exception serialization to include the stacktrace and inner exceptions.
+
+## [12.2.2] - 2018-08-15
+### Modified
+- Audit.WebApi, Audit.WebApi.Core: Adding AuditIgnoreAttribute for controller, actions and arguments.
+- Audit.EntityFramework: Adding DefaultAuditContext and documentation on readme.md about using the library without inheritance.
+
+## [12.2.1] - 2018-08-09
+### Modified
+- Audit.EntityFramework and Audit.EntityFramework.Core: Removing SqlServer.Design dependency
+
+## [12.2.0] - 2018-08-08
+### Added
+- Audit.NET: Added FileDataProvider constructor overload with fluent API.
+- Audit.NET.SqlServer: Added SqlDataProvider constructor overload with fluent API.
+- Audit.NET.PostgreSql: Added PostgreSqlDataProvider constructor overload with fluent API.
+- Audit.NET.MySql: Added MySqlDataProvider constructor overload with fluent API.
+- Audit.NET.MongoDB: Added MongoDataProvider constructor overload with fluent API.
+- Audit.NET.log4net: Added Log4netDataProvider constructor overload with fluent API.
+- Audit.NET.ElasticSearch: Added ElasticSearchDataProvider constructor overload with fluent API.
+
+
+## [12.1.11] - 2018-07-30
+### Added
+- Audit.WebApi, Audit.WebApi.Core and Audit.Mvc.Core: Added `TraceId` field on the output, with the internal ASP.NET correlation id per request.
+- Added Audit.WebApi.Template dotnet new template.
+
 ## [12.1.10] - 2018-07-20
 ### Added
-- Audit.EntityFramework and Audit.EntityFramework.Core: Adding support for ambien transactions (i.e. TransactionScope) on EF Core 2.1. Added AmbientTransactionId field to EF event output.
-
+- Audit.EntityFramework and Audit.EntityFramework.Core: Adding support for ambient transactions (i.e. TransactionScope) on EF Core 2.1. Added AmbientTransactionId field to EF event output.
 
 ## [12.1.9] - 2018-07-10
 ### Added

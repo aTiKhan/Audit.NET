@@ -19,6 +19,10 @@ using Audit.AzureDocumentDB.Providers;
 using Audit.AzureDocumentDB.ConfigurationApi;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
+using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.Model;
+using Audit.DynamoDB.Providers;
+using Amazon.DynamoDBv2.DocumentModel;
 
 namespace Audit.IntegrationTest
 {
@@ -28,7 +32,210 @@ namespace Audit.IntegrationTest
         [TestFixture]
         public class AuditTests
         {
-#if NET451
+            [Test]
+            public void Test_FileDataProvider_FluentApi()
+            {
+                var x = new FileDataProvider(_ => _
+                    .Directory(@"c:\t")
+                    .FilenameBuilder(ev => "fn")
+                    .FilenamePrefix("px")
+                    .JsonSettings(new JsonSerializerSettings() { DefaultValueHandling = DefaultValueHandling.Populate }));
+                Assert.AreEqual(@"c:\t", x.DirectoryPath);
+                Assert.AreEqual("fn", x.FilenameBuilder.Invoke(null));
+                Assert.AreEqual("px", x.FilenamePrefix);
+                Assert.AreEqual(DefaultValueHandling.Populate, x.JsonSettings.DefaultValueHandling);
+            }
+
+            [Test]
+            [Category("Elasticsearch")]
+            public void Test_ElasticSearchDataProvider_FluentApi()
+            {
+#pragma warning disable CS0618 // Type or member is obsolete
+                var x = new Elasticsearch.Providers.ElasticsearchDataProvider(_ => _
+                    .ConnectionSettings(new Elasticsearch.Providers.AuditConnectionSettings(new Uri("http://server/")))
+                    .Id(ev => "id")
+                    .Index("ix")
+                    .Type(ev => Nest.TypeName.From<int>()));
+#pragma warning restore CS0618 // Type or member is obsolete
+
+                Assert.AreEqual("http://server/", (x.ConnectionSettings.ConnectionPool.Nodes.First().Uri.ToString()));
+                Assert.IsTrue(x.IdBuilder.Invoke(null).Equals(new Nest.Id("id")));
+                Assert.AreEqual("ix", x.IndexBuilder.Invoke(null).Name);
+#pragma warning disable CS0618 // Type or member is obsolete
+                Assert.AreEqual(Nest.TypeName.From<int>(), x.TypeNameBuilder.Invoke(null));
+#pragma warning restore CS0618 // Type or member is obsolete
+            }
+
+            [Test]
+            [Category("Mongo")]
+            public void Test_MongoDataProvider_FluentApi()
+            {
+                var x = new MongoDB.Providers.MongoDataProvider(_ => _
+                    .ConnectionString("c")
+                    .Collection("col")
+                    .CustomSerializerSettings(new JsonSerializerSettings() { DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate })
+                    .Database("db"));
+                Assert.AreEqual("c", x.ConnectionString);
+                Assert.AreEqual("col", x.Collection);
+                Assert.AreEqual(DefaultValueHandling.IgnoreAndPopulate, x.JsonSerializerSettings.DefaultValueHandling);
+                Assert.AreEqual("db", x.Database);
+            }
+
+            [Test]
+            [Category("MySql")]
+            public void Test_MySqlDataProvider_FluentApi()
+            {
+                var x = new MySql.Providers.MySqlDataProvider(_ => _
+                    .ConnectionString("c")
+                    .IdColumnName("id")
+                    .JsonColumnName("j")
+                    .TableName("t"));
+                Assert.AreEqual("c", x.ConnectionString);
+                Assert.AreEqual("id", x.IdColumnName);
+                Assert.AreEqual("j", x.JsonColumnName);
+                Assert.AreEqual("t", x.TableName);
+            }
+
+            [Test]
+            [Category("PostgreSQL")]
+            public void Test_PostgreDataProvider_FluentApi()
+            {
+                var x = new PostgreSql.Providers.PostgreSqlDataProvider(_ => _
+                    .ConnectionString("c")
+                    .DataColumn("dc")
+                    .IdColumnName("id")
+                    .LastUpdatedColumnName("lud")
+                    .Schema("sc")
+                    .TableName("t")
+                    .CustomColumn("c1", ev => 1)
+                    .CustomColumn("c2", ev => 2));
+                Assert.AreEqual("c", x.ConnectionString);
+                Assert.AreEqual("dc", x.DataColumnName);
+                Assert.AreEqual("id", x.IdColumnName);
+                Assert.AreEqual("lud", x.LastUpdatedDateColumnName);
+                Assert.AreEqual("sc", x.Schema);
+                Assert.AreEqual("t", x.TableName);
+                Assert.AreEqual(2, x.CustomColumns.Count);
+                Assert.AreEqual("c1", x.CustomColumns[0].Name);
+                Assert.AreEqual(1, x.CustomColumns[0].Value.Invoke(null));
+                Assert.AreEqual("c2", x.CustomColumns[1].Name);
+                Assert.AreEqual(2, x.CustomColumns[1].Value.Invoke(null));
+            }
+
+            [Test]
+            [Category("SQL")]
+            public void Test_SqlDataProvider_FluentApi()
+            {
+                var x = new SqlDataProvider(_ => _
+                    .ConnectionString("cnnString")
+                    .IdColumnName(ev => ev.EventType)
+                    .JsonColumnName("json")
+                    .LastUpdatedColumnName("last")
+                    .Schema(ev => "schema")
+                    .TableName("table")
+                    .CustomColumn("EventType", ev => ev.EventType)
+#if NET452
+                    .SetDatabaseInitializerNull()
+#endif
+                    );
+                Assert.AreEqual("cnnString", x.ConnectionStringBuilder.Invoke(null));
+                Assert.AreEqual("evType", x.IdColumnNameBuilder.Invoke(new AuditEvent() { EventType = "evType" }));
+                Assert.AreEqual("json", x.JsonColumnNameBuilder.Invoke(null));
+                Assert.IsTrue(x.CustomColumns.Any(cc => cc.Name == "EventType" && (string)cc.Value.Invoke(new AuditEvent() { EventType = "pepe" }) == "pepe"));
+                Assert.AreEqual("last", x.LastUpdatedDateColumnNameBuilder.Invoke(null));
+                Assert.AreEqual("schema", x.SchemaBuilder.Invoke(null));
+                Assert.AreEqual("table", x.TableNameBuilder.Invoke(null));
+#if NET452
+                Assert.AreEqual(true, x.SetDatabaseInitializerNull);
+#endif
+            }
+
+            [Test]
+            [Category("EF")]
+            public void Test_EfDataProvider_FluentApi()
+            {
+                var ctx = new OtherContextFromDbContext();
+                var x = new EntityFramework.Providers.EntityFrameworkDataProvider(_ => _
+                    .UseDbContext(ev => ctx)
+                    .AuditTypeExplicitMapper(cfg => cfg
+                        .Map<Blog, AuditBlog>()
+                        .Map<Post, AuditPost>())
+                    .IgnoreMatchedProperties(true));
+
+
+                Assert.AreEqual(true, x.IgnoreMatchedProperties);
+                Assert.AreEqual(ctx, x.DbContextBuilder.Invoke(null));
+                Assert.AreEqual(typeof(AuditBlog), x.AuditTypeMapper.Invoke(typeof(Blog), null));
+                Assert.AreEqual(typeof(AuditPost), x.AuditTypeMapper.Invoke(typeof(Post), null));
+                Assert.AreEqual(null, x.AuditTypeMapper.Invoke(typeof(AuditBlog), null));
+            }
+
+            [Test]
+            [Category("EF")]
+            public void Test_EfDataProvider_FluentApi2()
+            {
+                var ctx = new OtherContextFromDbContext();
+                var x = new EntityFramework.Providers.EntityFrameworkDataProvider(_ => _
+                    .UseDbContext(ev => ctx)
+                    .AuditTypeMapper(t => typeof(AuditBlog))
+                    .AuditEntityAction((ev, ent, obj) =>
+                    {
+                        return ((dynamic)obj).Id == 1;
+                    })
+                    .IgnoreMatchedProperties(true));
+
+
+                Assert.AreEqual(true, x.IgnoreMatchedProperties);
+                Assert.AreEqual(ctx, x.DbContextBuilder.Invoke(null));
+                Assert.AreEqual(typeof(AuditBlog), x.AuditTypeMapper.Invoke(typeof(Blog), null));
+                Assert.AreEqual(typeof(AuditBlog), x.AuditTypeMapper.Invoke(typeof(Post), null));
+                Assert.AreEqual(true, x.AuditEntityAction.Invoke(new AuditEvent(), new EntityFramework.EventEntry(), new { Id = 1 }));
+            }
+
+            [Test]
+            [Category("EF")]
+            public void Test_EfDataProvider_FluentApi3()
+            {
+                var ctx = new OtherContextFromDbContext();
+                var x = new EntityFramework.Providers.EntityFrameworkDataProvider(_ => _
+                    .UseDbContext(ev => ctx)
+                    .AuditTypeNameMapper(s => "Audit" + s)
+                    .AuditEntityAction((ev, ent, obj) =>
+                    {
+                        return ((dynamic)obj).Id == 1;
+                    })
+                    .IgnoreMatchedProperties(true));
+
+
+                Assert.AreEqual(true, x.IgnoreMatchedProperties);
+                Assert.AreEqual(ctx, x.DbContextBuilder.Invoke(null));
+                Assert.AreEqual(typeof(AuditBlog), x.AuditTypeMapper.Invoke(typeof(Blog), null));
+                Assert.AreEqual(typeof(AuditPost), x.AuditTypeMapper.Invoke(typeof(Post), null));
+                Assert.AreEqual(true, x.AuditEntityAction.Invoke(new AuditEvent(), new EntityFramework.EventEntry(), new { Id = 1 }));
+            }
+
+            [Test]
+            [Category("EF")]
+            public void Test_EfDataProvider_FluentApi4()
+            {
+                var ctx = new OtherContextFromDbContext();
+                var x = new EntityFramework.Providers.EntityFrameworkDataProvider(_ => _
+                    .UseDbContext(ev => ctx)
+                    .AuditTypeExplicitMapper(cfg => cfg
+                        .Map<Blog>(entry => entry.Action == "Update" ? typeof(AuditPost) : typeof(AuditBlog))
+                        .Map<Post, AuditPost>())
+                    .IgnoreMatchedProperties(true));
+
+
+                Assert.AreEqual(true, x.IgnoreMatchedProperties);
+                Assert.AreEqual(ctx, x.DbContextBuilder.Invoke(null));
+                Assert.AreEqual(typeof(AuditPost), x.AuditTypeMapper.Invoke(typeof(Blog), new EntityFramework.EventEntry() { Action = "Update" }));
+                Assert.AreEqual(typeof(AuditBlog), x.AuditTypeMapper.Invoke(typeof(Blog), new EntityFramework.EventEntry() { Action = "Insert" }));
+                Assert.AreEqual(typeof(AuditPost), x.AuditTypeMapper.Invoke(typeof(Post), null));
+                Assert.AreEqual(null, x.AuditTypeMapper.Invoke(typeof(AuditBlog), null));
+            }
+
+#if NET452
             [Test]
             public void Test_StrongName_PublicToken()
             {
@@ -105,6 +312,24 @@ namespace Audit.IntegrationTest
 
             [Test]
             [Category("AzureBlob")]
+            public void TestAzureBlob_ActiveDirectory()
+            {
+                SetAzureBlobSettings_ActiveDirectory();
+                TestUpdate();
+                TestInsert();
+                TestDelete();
+            }
+
+            [Test]
+            [Category("AzureBlob")]
+            public async Task TestAzureBlobAsync_ActiveDirectory()
+            {
+                SetAzureBlobSettings_ActiveDirectory();
+                await TestUpdateAsync();
+            }
+
+            [Test]
+            [Category("AzureBlob")]
             public void TestStressAzureBlob()
             {
                 Audit.Core.Configuration.Setup()
@@ -115,11 +340,11 @@ namespace Audit.IntegrationTest
                    .WithCreationPolicy(EventCreationPolicy.InsertOnStartReplaceOnEnd);
 
                 var rnd = new Random();
-                
+
                 //Parallel random insert into event1, event2 and event3 containers
                 Parallel.ForEach(Enumerable.Range(1, 100), i =>
                 {
-                    var eventType =  "event" + rnd.Next(1, 4); //1..3
+                    var eventType = "event" + rnd.Next(1, 4); //1..3
                     var x = "start";
                     using (var s = AuditScope.Create(eventType, () => x, EventCreationPolicy.InsertOnStartReplaceOnEnd))
                     {
@@ -146,6 +371,56 @@ namespace Audit.IntegrationTest
                     } while (continuationToken != null);
                 }
             }
+
+            [Test]
+            [Category("Dynamo")]
+            public void TestStressDynamo()
+            {
+                int N = 32;
+                SetDynamoSettings();
+                var hashes = new HashSet<string>();
+                int count = 0;
+                Audit.Core.Configuration.AddCustomAction(ActionType.OnEventSaved, scope =>
+                {
+                    count++;
+                    hashes.Add((scope.EventId as object[])[0].ToString());
+                });
+
+                var rnd = new Random();
+
+                //Parallel random insert into event1, event2 and event3 containers
+                Parallel.ForEach(Enumerable.Range(1, N), i =>
+                {
+                    var eventType = "AuditEvents";
+                    var x = "start";
+                    using (var s = AuditScope.Create(eventType, () => x, EventCreationPolicy.InsertOnStartReplaceOnEnd))
+                    {
+                        x = "end";
+                    }
+                });
+
+                Assert.AreEqual(N, hashes.Count);
+                Assert.AreEqual(N*2, count);
+
+                // Assert events
+                int maxCheck = N / 4;
+                int check = 0;
+                foreach(var hash in hashes)
+                {
+                    if (check++ > maxCheck)
+                    {
+                        break;
+                    }
+                    var ddp = (Configuration.DataProvider as DynamoDataProvider);
+                    var ev = ddp.GetEvent<AuditEvent>((Primitive)hash, (Primitive)DateTime.Now.Year);
+
+                    Assert.NotNull(ev);
+                    Assert.AreEqual("AuditEvents", ev.EventType);
+                    Assert.AreEqual(DateTime.Now.Year, ev.CustomFields["SortKey"]);
+                    Assert.AreEqual(hash, ev.CustomFields["HashKey"]);
+                }
+            }
+
 
             [Test]
             [Category("AzureBlob")]
@@ -220,6 +495,38 @@ namespace Audit.IntegrationTest
             }
 
             [Test]
+            [Category("Mongo")]
+            public void TestMongoDateSerialization()
+            {
+                Audit.Core.Configuration.Setup()
+                    .UseMongoDB(config => config
+                        .ConnectionString("mongodb://localhost:27017")
+                        .Database("Audit")
+                        .Collection("Event"))
+                    .WithCreationPolicy(EventCreationPolicy.InsertOnEnd)
+                    .ResetActions();
+
+                object evId = null;
+                Audit.Core.Configuration.AddCustomAction(ActionType.OnEventSaved, s =>
+                {
+                    if (evId != null)
+                    {
+                        Assert.Fail("evId should be null");
+                    }
+                    evId = s.EventId;
+                });
+                var now = DateTime.UtcNow;
+                using (var s = AuditScope.Create("test", null, new { someDate = now }))
+                {
+                }
+                Audit.Core.Configuration.ResetCustomActions();
+                var dp = Audit.Core.Configuration.DataProvider as MongoDataProvider;
+                var evt = dp.GetEvent(evId);
+
+                Assert.AreEqual(now.ToString("yyyyMMddHHmmss"), (evt.CustomFields["someDate"] as DateTime?).Value.ToString("yyyyMMddHHmmss"));
+            }
+
+            [Test]
             [Category("MySql")]
             public void TestMySql()
             {
@@ -262,6 +569,24 @@ namespace Audit.IntegrationTest
             public async Task TestElasticsearchAsync()
             {
                 SetElasticsearchSettings();
+                await TestUpdateAsync();
+            }
+
+            [Test]
+            [Category("Dynamo")]
+            public void TestDynamo()
+            {
+                SetDynamoSettings();
+                TestUpdate();
+                TestInsert();
+                TestDelete();
+            }
+
+            [Test]
+            [Category("Dynamo")]
+            public async Task TestDynamoAsync()
+            {
+                SetDynamoSettings();
                 await TestUpdateAsync();
             }
 
@@ -325,8 +650,8 @@ namespace Audit.IntegrationTest
 
                 //audit multiple 
                 using (var a = AuditScope.Create(eventType, () => order.Status, new { ReferenceId = order.OrderId }))
-                { 
-                   ev = a.Event;
+                {
+                    ev = a.Event;
                     order = DbOrderUpdateStatus(order, OrderStatus.Submitted);
                 }
 
@@ -488,7 +813,7 @@ namespace Audit.IntegrationTest
                 Assert.AreEqual(orderId, ev.CustomFields["ReferenceId"]);
             }
 
-#if NET451 || NETCOREAPP2_0
+#if NET452 || NETCOREAPP2_0 || NETCOREAPP2_1
             [Test]
             public void TestEventLog()
             {
@@ -542,6 +867,19 @@ namespace Audit.IntegrationTest
                     .WithCreationPolicy(EventCreationPolicy.InsertOnStartReplaceOnEnd);
             }
 
+            public void SetAzureBlobSettings_ActiveDirectory()
+            {
+                Audit.Core.Configuration.Setup()
+                    .UseAzureBlobStorage(config => config
+                        .AzureActiveDirectory(adConfig => adConfig
+                            .AccountName(AzureSettings.BlobAccountName)
+                            .TenantId(AzureSettings.BlobTenantId))
+                        .ContainerNameBuilder(ev => $"events{DateTime.Today:yyyyMMdd}")
+                        .BlobNameBuilder(ev => $"{ev.StartDate:yyyy-MM}/{ev.Environment.UserName}/{Guid.NewGuid()}.json"))
+                    .WithCreationPolicy(EventCreationPolicy.InsertOnStartReplaceOnEnd);
+            }
+
+
             public void SetAzureTableSettings()
             {
                 Audit.Core.Configuration.Setup()
@@ -552,8 +890,8 @@ namespace Audit.IntegrationTest
                             .PartitionKey("testpart")
                             .Columns(cols => cols.FromObject(ev => new { ev.EventType, ev.Environment.UserName, ev.StartDate, ev.Duration }))))
                     .WithCreationPolicy(EventCreationPolicy.InsertOnStartReplaceOnEnd);
-             }
-        
+            }
+
             public void SetSqlSettings()
             {
                 Audit.Core.Configuration.Setup()
@@ -562,7 +900,13 @@ namespace Audit.IntegrationTest
                         .TableName(ev => "Event")
                         .IdColumnName(ev => "EventId")
                         .JsonColumnName(ev => "Data")
-                        .LastUpdatedColumnName("LastUpdatedDate"))
+                        .LastUpdatedColumnName("LastUpdatedDate")
+                        .CustomColumn("EventType", ev => ev.EventType)
+                        .CustomColumn("SomeDate", _ => DateTime.UtcNow)
+#if NET452
+                        .SetDatabaseInitializerNull()
+#endif
+                        )
                     .WithCreationPolicy(EventCreationPolicy.InsertOnStartReplaceOnEnd)
                     .ResetActions();
             }
@@ -572,10 +916,12 @@ namespace Audit.IntegrationTest
                 Audit.Core.Configuration.Setup()
                     .UsePostgreSql(config => config
                         .ConnectionString("Server=localhost;Port=5432;User Id=fede;Password=fede;Database=postgres;")
-                        .TableName("eventb")
+                        .TableName("event")
                         .IdColumnName("id")
                         .DataColumn("data", Audit.PostgreSql.Configuration.DataType.JSONB)
-                        .LastUpdatedColumnName("updated_date"))
+                        .LastUpdatedColumnName("updated_date")
+                        .CustomColumn("event type", ev => ev.EventType)
+                        .CustomColumn("some_date", ev => DateTime.UtcNow))
                     .WithCreationPolicy(EventCreationPolicy.InsertOnStartReplaceOnEnd)
                     .ResetActions();
             }
@@ -592,7 +938,7 @@ namespace Audit.IntegrationTest
             }
 
             public void SetMySqlSettings()
-            { 
+            {
                 Audit.Core.Configuration.Setup()
                     .UseMySql(config => config
                         .ConnectionString("Server=localhost; Database=events; Uid=admin; Pwd=admin;")
@@ -616,7 +962,7 @@ namespace Audit.IntegrationTest
 
             public void SetElasticsearchSettings()
             {
-                var uri = new Uri("http://localhost:9200");
+                var uri = new Uri(AzureSettings.ElasticSearchUrl);
                 var ec = new Nest.ElasticClient(uri);
                 ec.DeleteIndex(Nest.Indices.AllIndices, x => x.Index("auditevent"));
 
@@ -627,6 +973,54 @@ namespace Audit.IntegrationTest
                         .Id(ev => Guid.NewGuid()))
                     .WithCreationPolicy(EventCreationPolicy.InsertOnStartReplaceOnEnd)
                     .ResetActions();
+            }
+
+            public void SetDynamoSettings()
+            {
+                var url = "http://localhost:8000";
+                var tableName = "AuditEvents";
+                CreateDynamoTable(tableName).GetAwaiter().GetResult();
+
+                Audit.Core.Configuration.Setup()
+                    .UseDynamoDB(config => config
+                        .UseUrl(url)
+                        .Table(tableName)
+                        .SetAttribute("HashKey", ev => Guid.NewGuid())
+                        .SetAttribute("SortKey", ev => ev.StartDate.Year))
+                    .WithCreationPolicy(EventCreationPolicy.InsertOnStartReplaceOnEnd)
+                    .ResetActions();
+            }
+
+            private async Task CreateDynamoTable(string tableName)
+            {
+                AmazonDynamoDBConfig ddbConfig = new AmazonDynamoDBConfig
+                {
+                    ServiceURL = "http://localhost:8000"
+                };
+                var client = new AmazonDynamoDBClient(ddbConfig);
+                try
+                {
+                    await client.DeleteTableAsync(tableName);
+                }
+                catch
+                {
+                }
+
+                await client.CreateTableAsync(new CreateTableRequest()
+                {
+                    TableName = tableName,
+                    KeySchema = new List<KeySchemaElement>()
+                    {
+                        new KeySchemaElement("HashKey", KeyType.HASH),
+                        new KeySchemaElement("SortKey", KeyType.RANGE)
+                    },
+                    AttributeDefinitions = new List<AttributeDefinition>()
+                    {
+                        new AttributeDefinition("HashKey", ScalarAttributeType.S),
+                        new AttributeDefinition("SortKey", ScalarAttributeType.N)
+                    },
+                    ProvisionedThroughput = new ProvisionedThroughput(100, 100)
+                });
             }
 
             public static void ExecuteStoredProcedure(IntegrationTests.CustomerOrder order, IntegrationTests.OrderStatus status)

@@ -14,6 +14,7 @@ using System.Linq;
 using Newtonsoft.Json;
 using Audit.EntityFramework.ConfigurationApi;
 using System.Threading;
+using Newtonsoft.Json.Linq;
 
 namespace Audit.UnitTest
 {
@@ -27,12 +28,114 @@ namespace Audit.UnitTest
         }
 
         [Test]
+        public void Test_AuditScope_CustomSystemClock()
+        {
+            Audit.Core.Configuration.SystemClock = new MyClock();
+            var evs = new List<AuditEvent>();
+            Audit.Core.Configuration.Setup()
+                .Use(x => x
+                    .OnInsertAndReplace(ev =>
+                    {
+                        evs.Add(ev);
+                    }))
+                .WithCreationPolicy(EventCreationPolicy.InsertOnEnd);
+
+            using (var scope = AuditScope.Create("Test_AuditScope_CustomSystemClock", () => new { someProp = true }))
+            {
+                scope.SetCustomField("test", 123);
+            }
+            Audit.Core.Configuration.SystemClock = new DefaultSystemClock();
+
+            Assert.AreEqual(1, evs.Count);
+            Assert.AreEqual(10000, evs[0].Duration);
+            Assert.AreEqual(new DateTime(2020, 1, 1, 0, 0, 0), evs[0].StartDate);
+            Assert.AreEqual(new DateTime(2020, 1, 1, 0, 0, 10), evs[0].EndDate);
+        }
+
+        [Test]
+        public void Test_AuditScope_SetTargetGetter()
+        {
+            var evs = new List<AuditEvent>();
+            Audit.Core.Configuration.Setup()
+                .Use(x => x
+                    .OnInsertAndReplace(ev =>
+                    {
+                        evs.Add(ev);
+                    }))
+                .WithCreationPolicy(EventCreationPolicy.InsertOnEnd);
+
+            var obj = new SomeClass() { Id = 1, Name = "Test" };
+
+            using (var scope = AuditScope.Create("Test", () => new { ShouldNotUseThisObject = true }))
+            {
+                scope.SetTargetGetter(() => obj);
+                obj.Id = 2;
+                obj.Name = "NewTest";
+            }
+            obj.Id = 3;
+            obj.Name = "X";
+
+            Assert.AreEqual(1, evs.Count);
+            Assert.AreEqual("SomeClass", evs[0].Target.Type);
+            Assert.AreEqual(1, (evs[0].Target.SerializedOld as JObject).ToObject<SomeClass>().Id);
+            Assert.AreEqual("Test", (evs[0].Target.SerializedOld as JObject).ToObject<SomeClass>().Name);
+            Assert.AreEqual(2, (evs[0].Target.SerializedNew as JObject).ToObject<SomeClass>().Id);
+            Assert.AreEqual("NewTest", (evs[0].Target.SerializedNew as JObject).ToObject<SomeClass>().Name);
+        }
+
+        [Test]
+        public void Test_AuditScope_SetTargetGetter_ReturnsNull()
+        {
+            var evs = new List<AuditEvent>();
+            Audit.Core.Configuration.Setup()
+                .Use(x => x
+                    .OnInsertAndReplace(ev =>
+                    {
+                        evs.Add(ev);
+                    }))
+                .WithCreationPolicy(EventCreationPolicy.InsertOnEnd);
+
+
+            using (var scope = AuditScope.Create("Test", () => new { ShouldNotUseThisObject = true }))
+            {
+                scope.SetTargetGetter(() => null);
+            }
+
+            Assert.AreEqual(1, evs.Count);
+            Assert.AreEqual("Object", evs[0].Target.Type);
+            Assert.IsNull(evs[0].Target.SerializedOld);
+            Assert.IsNull(evs[0].Target.SerializedNew);
+        }
+
+        [Test]
+        public void Test_AuditScope_SetTargetGetter_IsNull()
+        {
+            var evs = new List<AuditEvent>();
+            Audit.Core.Configuration.Setup()
+                .Use(x => x
+                    .OnInsertAndReplace(ev =>
+                    {
+                        evs.Add(ev);
+                    }))
+                .WithCreationPolicy(EventCreationPolicy.InsertOnEnd);
+
+
+            using (var scope = AuditScope.Create("Test", () => new { ShouldNotUseThisObject = true }))
+            {
+                scope.SetTargetGetter(null);
+            }
+
+            Assert.AreEqual(1, evs.Count);
+            Assert.IsNull(evs[0].Target);
+        }
+
+        [Test]
         public void Test_AuditEvent_CustomSerializer()
         {
             var listEv = new List<AuditEvent>();
             var listJson = new List<string>();
             Audit.Core.Configuration.Setup()
-                .UseDynamicProvider(x => x
+                .Use(x => x
                     .OnInsertAndReplace(ev =>
                     {
                         listEv.Add(ev);
@@ -75,7 +178,7 @@ namespace Audit.UnitTest
             var list = new List<AuditEvent>();
             Audit.Core.Configuration.Setup()
                 .AuditDisabled(true)
-                .UseDynamicProvider(x => x
+                .Use(x => x
                     .OnInsertAndReplace(ev =>
                     {
                         list.Add(ev);
@@ -411,7 +514,7 @@ namespace Audit.UnitTest
                 .ForContext<MyContext>(x => x.AuditEventType("ForContext"))
                 .UseOptIn();
             EntityFramework.Configuration.Setup()
-                .ForAnyContext(x => x.AuditEventType("ForAnyContext").IncludeEntityObjects(true))
+                .ForAnyContext(x => x.AuditEventType("ForAnyContext").IncludeEntityObjects(true).ExcludeValidationResults(true))
                 .UseOptOut();
 
             var ctx = new MyContext();
@@ -419,6 +522,7 @@ namespace Audit.UnitTest
 
             Assert.AreEqual("FromAttr", ctx.AuditEventType);
             Assert.AreEqual(true, ctx.IncludeEntityObjects);
+            Assert.AreEqual(true, ctx.ExcludeValidationResults);
             Assert.AreEqual(AuditOptionMode.OptIn, ctx.Mode);
 
             Assert.AreEqual("ForAnyContext", ctx2.AuditEventType);
@@ -481,7 +585,7 @@ namespace Audit.UnitTest
             
             var eventType = "event type 1";
             var target = "test";
-            Core.Configuration.AddCustomAction(ActionType.OnScopeCreated, scope =>
+            Core.Configuration.AddOnCreatedAction(scope =>
             {
                 scope.SetCustomField("custom field", "test");
                 if (scope.EventType == eventType)
@@ -489,7 +593,7 @@ namespace Audit.UnitTest
                     scope.Discard();
                 }
             });
-            Core.Configuration.AddCustomAction(ActionType.OnEventSaving, scope =>
+            Core.Configuration.AddOnSavingAction(scope =>
             {
                 Assert.True(false, "This should not be executed");
             });
@@ -752,6 +856,11 @@ namespace Audit.UnitTest
             public override string AuditEventType { get { return base.AuditEventType; } }
             public override bool IncludeEntityObjects { get { return base.IncludeEntityObjects; } }
             public override AuditOptionMode Mode { get { return base.Mode; } }
+        }
+        public class SomeClass
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
         }
     }
 }

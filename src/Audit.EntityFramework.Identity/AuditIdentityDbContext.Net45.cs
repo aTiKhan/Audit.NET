@@ -1,79 +1,92 @@
-﻿using System;
+﻿#if NET45
+using System.Data.Entity.Infrastructure;
+using System.Data.Common;
+using Microsoft.AspNet.Identity.EntityFramework;
+using Audit.Core;
+using System.Data.Entity;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Audit.Core;
 using System.Threading;
+using System;
 using Audit.EntityFramework.ConfigurationApi;
-#if NETSTANDARD1_5
-using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
-#elif NETSTANDARD2_0 || NET461
-using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
-#else
-using Microsoft.AspNet.Identity.EntityFramework;
-using System.Data.Common;
-using System.Data.Entity;
-using System.Data.Entity.Infrastructure;
-#endif
 
 namespace Audit.EntityFramework
 {
     /// <summary>
     /// Base IdentityDbContext class for Audit. Inherit your IdentityDbContext from this class to enable audit.
     /// </summary>
-#if NETSTANDARD1_5 || NETSTANDARD2_0 || NET461
-    public abstract partial class AuditIdentityDbContext<TUser, TRole, TKey, TUserClaim, TUserRole, TUserLogin, TRoleClaim, TUserToken>
-        : IdentityDbContext<TUser, TRole, TKey, TUserClaim, TUserRole, TUserLogin, TRoleClaim, TUserToken>, IAuditDbContext, IAuditBypass
-#if NETSTANDARD1_5
-        where TUser : IdentityUser<TKey, TUserClaim, TUserRole, TUserLogin>
-        where TRole : IdentityRole<TKey, TUserRole, TRoleClaim>
-#else
-        where TUser : IdentityUser<TKey>
-        where TRole : IdentityRole<TKey>
-#endif
-        where TKey : IEquatable<TKey>
-        where TUserClaim : IdentityUserClaim<TKey>
-        where TUserRole : IdentityUserRole<TKey>
-        where TUserLogin : IdentityUserLogin<TKey>
-        where TRoleClaim : IdentityRoleClaim<TKey>
-        where TUserToken : IdentityUserToken<TKey>
-#elif NET45
-    public abstract partial class AuditIdentityDbContext<TUser, TRole, TKey, TUserLogin, TUserRole, TUserClaim>
-        : IdentityDbContext<TUser, TRole, TKey, TUserLogin, TUserRole, TUserClaim>, IAuditDbContext, IAuditBypass
-        where TUser : IdentityUser<TKey, TUserLogin, TUserRole, TUserClaim>
-        where TRole : IdentityRole<TKey, TUserRole>
-        where TUserLogin : IdentityUserLogin<TKey>
-        where TUserRole : IdentityUserRole<TKey>
-        where TUserClaim : IdentityUserClaim<TKey>
-#endif
+    public abstract class AuditIdentityDbContext : AuditIdentityDbContext<IdentityUser, IdentityRole, string, IdentityUserLogin, IdentityUserRole, IdentityUserClaim>, IAuditBypass
     {
-        private DbContextHelper _helper = new DbContextHelper();
-
-        /// <summary>
-        /// Initializes a new instance of the AuditIdentityDbContext
-        /// </summary>
-        public AuditIdentityDbContext() : base()
-        {
-            _helper.SetConfig(this);
-        }
-#if NETSTANDARD1_5 || NETSTANDARD2_0 || NET461
         /// <summary>
         /// Initializes a new instance of AuditIdentityDbContext
         /// </summary>
-        /// <param name="options">The options to be used by a Microsoft.EntityFrameworkCore.DbContext</param>
-        public AuditIdentityDbContext(DbContextOptions options) : base(options)
-        {
-            _helper.SetConfig(this);
-        }
-#elif NET45
+        public AuditIdentityDbContext() : base()
+        { }
         /// <summary>
         /// Initializes a new instance of AuditIdentityDbContext
         /// </summary>
         /// <param name="nameOrConnectionString">Either the database name or a connection string.</param>
         public AuditIdentityDbContext(string nameOrConnectionString) : base(nameOrConnectionString)
-        { 
+        { }
+        /// <summary>
+        /// Initializes a new instance of AuditIdentityDbContext
+        /// </summary>
+        /// <param name="model">The model that will back this context.</param>
+        public AuditIdentityDbContext(DbCompiledModel model) : base(model)
+        { }
+        /// <summary>
+        /// Initializes a new instance of AuditIdentityDbContext
+        /// </summary>
+        /// <param name="contextOwnsConnection">If set to true the connection is disposed when the context is disposed, otherwise the caller must dispose the connection.</param>
+        /// <param name="existingConnection">An existing connection to use for the new context.</param>
+        public AuditIdentityDbContext(DbConnection existingConnection, bool contextOwnsConnection) : base(existingConnection, contextOwnsConnection)
+        { }
+        /// <summary>
+        /// Initializes a new instance of AuditIdentityDbContext
+        /// </summary>
+        /// <param name="nameOrConnectionString">Either the database name or a connection string.</param>
+        /// <param name="model">The model that will back this context.</param>
+        public AuditIdentityDbContext(string nameOrConnectionString, DbCompiledModel model) : base(nameOrConnectionString, model)
+        { }
+        /// <summary>
+        /// Initializes a new instance of AuditIdentityDbContext
+        /// </summary>
+        /// <param name="existingConnection">An existing connection to use for the new context.</param>
+        /// <param name="model">The model that will back this context.</param>
+        /// <param name="contextOwnsConnection">If set to true the connection is disposed when the context is disposed, otherwise the caller must dispose the connection.</param>
+        public AuditIdentityDbContext(DbConnection existingConnection, DbCompiledModel model, bool contextOwnsConnection) : base(existingConnection, model, contextOwnsConnection)
+        { }
+    }
+
+    /// <summary>
+    /// Base IdentityDbContext class for Audit. Inherit your IdentityDbContext from this class to enable audit.
+    /// </summary>
+    public abstract class AuditIdentityDbContext<TUser> : IdentityDbContext<TUser>, IAuditDbContext, IAuditBypass
+        where TUser : IdentityUser
+    {
+        private DbContextHelper _helper = new DbContextHelper();
+
+        /// <summary>
+        /// Initializes a new instance of AuditIdentityDbContext
+        /// </summary>
+        public AuditIdentityDbContext(string nameOrConnectionString, bool throwIfV1Schema) : base(nameOrConnectionString, throwIfV1Schema)
+        {
+            _helper.SetConfig(this);
+        }
+
+        /// <summary>
+        /// Initializes a new instance of AuditIdentityDbContext
+        /// </summary>
+        public AuditIdentityDbContext() : base()
+        {
+            _helper.SetConfig(this);
+        }
+        /// <summary>
+        /// Initializes a new instance of AuditIdentityDbContext
+        /// </summary>
+        /// <param name="nameOrConnectionString">Either the database name or a connection string.</param>
+        public AuditIdentityDbContext(string nameOrConnectionString) : base(nameOrConnectionString)
+        {
             _helper.SetConfig(this);
         }
         /// <summary>
@@ -81,7 +94,7 @@ namespace Audit.EntityFramework
         /// </summary>
         /// <param name="model">The model that will back this context.</param>
         public AuditIdentityDbContext(DbCompiledModel model) : base(model)
-        { 
+        {
             _helper.SetConfig(this);
         }
         /// <summary>
@@ -90,7 +103,7 @@ namespace Audit.EntityFramework
         /// <param name="contextOwnsConnection">If set to true the connection is disposed when the context is disposed, otherwise the caller must dispose the connection.</param>
         /// <param name="existingConnection">An existing connection to use for the new context.</param>
         public AuditIdentityDbContext(DbConnection existingConnection, bool contextOwnsConnection) : base(existingConnection, contextOwnsConnection)
-        { 
+        {
             _helper.SetConfig(this);
         }
         /// <summary>
@@ -99,7 +112,7 @@ namespace Audit.EntityFramework
         /// <param name="nameOrConnectionString">Either the database name or a connection string.</param>
         /// <param name="model">The model that will back this context.</param>
         public AuditIdentityDbContext(string nameOrConnectionString, DbCompiledModel model) : base(nameOrConnectionString, model)
-        { 
+        {
             _helper.SetConfig(this);
         }
         /// <summary>
@@ -108,11 +121,11 @@ namespace Audit.EntityFramework
         /// <param name="existingConnection">An existing connection to use for the new context.</param>
         /// <param name="model">The model that will back this context.</param>
         /// <param name="contextOwnsConnection">If set to true the connection is disposed when the context is disposed, otherwise the caller must dispose the connection.</param>
-        public AuditIdentityDbContext(DbConnection existingConnection, DbCompiledModel model, bool contextOwnsConnection) : base (existingConnection, model, contextOwnsConnection)
-        { 
+        public AuditIdentityDbContext(DbConnection existingConnection, DbCompiledModel model, bool contextOwnsConnection) : base(existingConnection, model, contextOwnsConnection)
+        {
             _helper.SetConfig(this);
         }
-#endif
+
         /// <summary>
         /// To indicate the Audit Data Provider to use. (Default is NULL to use the configured default data provider). 
         /// </summary>
@@ -148,22 +161,31 @@ namespace Audit.EntityFramework
         public bool IncludeEntityObjects { get; set; }
 
         /// <summary>
+        /// To indicate if the entity validations should be avoided and excluded from the audit output. (Default is false)
+        /// </summary>
+        public bool ExcludeValidationResults { get; set; }
+
+        /// <summary>
         /// To indicate the audit operation mode. (Default is OptOut). 
         ///  - OptOut: All the entities are tracked by default, except those decorated with the AuditIgnore attribute. 
         ///  - OptIn: No entity is tracked by default, except those decorated with the AuditInclude attribute.
         /// </summary>
         public AuditOptionMode Mode { get; set; }
 
-#if NET45
         /// <summary>
         /// Value to indicate if the Independant Associations should be included. Independant associations are logged on EntityFrameworkEvent.Associations.
         /// </summary>
         public bool IncludeIndependantAssociations { get; set; }
-#endif
+
         /// <summary>
         /// A collection of settings per entity type.
         /// </summary>
-        public Dictionary<Type, EfEntitySettings> EntitySettings { get; set;  }
+        public Dictionary<Type, EfEntitySettings> EntitySettings { get; set; }
+
+        /// <summary>
+        /// To indicate if the Transaction Id retrieval should be ignored. If set to <c>true</c> the Transations Id will not be included on the output.
+        /// </summary>
+        public bool ExcludeTransactionId { get; set; }
 
         /// <summary>
         /// Called after the audit scope is created.
@@ -221,3 +243,5 @@ namespace Audit.EntityFramework
         }
     }
 }
+
+#endif

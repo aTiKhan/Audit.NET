@@ -16,6 +16,10 @@ namespace Audit.WebApi
         private AuditApiAdapter _adapter = new AuditApiAdapter();
 
         /// <summary>
+        /// Gets or sets a value indicating whether the output should include the Http Response Headers.
+        /// </summary>
+        public bool IncludeResponseHeaders { get; set; }
+        /// <summary>
         /// Gets or sets a value indicating whether the output should include the Http Request Headers.
         /// </summary>
         public bool IncludeHeaders { get; set; }
@@ -79,7 +83,7 @@ namespace Audit.WebApi
         
         public override async Task OnActionExecutingAsync(HttpActionContext actionContext, CancellationToken cancellationToken)
         {
-            if (Configuration.AuditDisabled)
+            if (Configuration.AuditDisabled || _adapter.IsActionIgnored(actionContext))
             {
                 return;
             }
@@ -88,11 +92,11 @@ namespace Audit.WebApi
 
         public override async Task OnActionExecutedAsync(HttpActionExecutedContext actionExecutedContext, CancellationToken cancellationToken)
         {
-            if (Configuration.AuditDisabled)
+            if (Configuration.AuditDisabled || _adapter.IsActionIgnored(actionExecutedContext.ActionContext))
             {
                 return;
             }
-            await _adapter.AfterExecutedAsync(actionExecutedContext, GetContextWrapper(actionExecutedContext.Request), IncludeModelState, ShouldIncludeResponseBody(actionExecutedContext));
+            await _adapter.AfterExecutedAsync(actionExecutedContext, GetContextWrapper(actionExecutedContext.Request), IncludeModelState, ShouldIncludeResponseBody(actionExecutedContext), IncludeResponseHeaders);
         }
 
         private bool ShouldIncludeResponseBody(HttpActionExecutedContext context)

@@ -19,12 +19,18 @@ PM> Install-Package Audit.EntityFramework
 [![NuGet Status](https://img.shields.io/nuget/v/Audit.EntityFramework.svg?style=flat)](https://www.nuget.org/packages/Audit.EntityFramework/)
 [![NuGet Count](https://img.shields.io/nuget/dt/Audit.EntityFramework.svg)](https://www.nuget.org/packages/Audit.EntityFramework/)
 
-## Note 
+## Notes 
 
-If you are targeting the full .NET framework but want to use EntityFrameworkCore (EF >= 7), you should install the `Audit.EntityFramework.Core` package instead:
+If you target the full .NET framework but want to use EntityFrameworkCore (EF >= 7), you should install the `Audit.EntityFramework.Core` package instead:
 
 ```
 PM> Install-Package Audit.EntityFramework.Core
+```
+
+If you want to audit [ASP.NET Identity entities](https://msdn.microsoft.com/en-us/library/microsoft.aspnet.identity.entityframework.identitydbcontext(v=vs.108).aspx), you must also install the `Audit.EntityFramework.Identity` library:
+
+```
+PM> Install-Package Audit.EntityFramework.Identity
 ```
 
 ## Usage
@@ -50,18 +56,49 @@ public class MyContext : AuditDbContext // <-- inherit from Audit.EntityFramewor
 ```
 
 > If you're using [IdentityDbContext](https://msdn.microsoft.com/en-us/library/microsoft.aspnet.identity.entityframework.identitydbcontext(v=vs.108).aspx) instead of DbContext, 
-you should inherit from class `AuditIdentityDbContext`.
+you can install the package `Audit.EntityFramework.Identity` or `Audit.EntityFramework.Identity.Core` and inherit from the class `AuditIdentityDbContext` instead of `AuditDbContext`.
+
+## Without inheritance
+
+You can use the library without inheriting from `DbContext`/`AuditIdentityDbContext`.
+In order to to that, you can define your `DbContext` in the following way:
+
+```c#
+public class MyContext : DbContext
+{
+    private static DbContextHelper _helper = new DbContextHelper();
+    private readonly IAuditDbContext _auditContext;
+
+    public MyContext(DbContextOptions<MyContext> options) : base(options)
+    {
+        _auditContext = new DefaultAuditContext(this);
+        _helper.SetConfig(_auditContext);
+    }
+
+    public override int SaveChanges()
+    {
+        return _helper.SaveChanges(_auditContext, () => base.SaveChanges());
+    }
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default(CancellationToken))
+    {
+        return await _helper.SaveChangesAsync(_auditContext, () => base.SaveChangesAsync(cancellationToken));
+    }
+}
+```
+
 
 ## How it works
 This library intercepts calls to `SaveChanges()` / `SaveChangesAsync()` on your `DbContext`, to generate [Audit.NET events](https://github.com/thepirat000/Audit.NET#usage) with the affected entities information. 
 
 Each call to `SaveChanges` generates an audit event that includes information of all the entities affected by the save operation.
 
+
 ## Configuration
 
 ### Output
 
-The EF audit events are stored using a _Data Provider_. You can use one of the [available data providers](https://github.com/thepirat000/Audit.NET#data-providers-included) or implement your own. This can be set per `DbContext` instance or globally. Please refer to the [data providers](https://github.com/thepirat000/Audit.NET#data-providers) section on the Audit.NET documentation.
+The EF audit events are stored using a _Data Provider_. You can use one of the [available data providers](https://github.com/thepirat000/Audit.NET#data-providers-included) or implement your own. This can be set per `DbContext` instance or globally. If you plan to store the audit logs with EF, you can use the [Entity Framework Data Provider](#entity-framework-data-provider). 
 
 ### Settings
 The following settings can be configured per DbContext or globally:
@@ -73,6 +110,9 @@ The following settings can be configured per DbContext or globally:
 - **AuditEventType**: To indicate the event type to use on the audit event. (Default is the context name). Can contain the following placeholders: 
    - \{context}: replaced with the Db Context type name.
    - \{database}: replaced with the database name.
+- **IncludeIndependantAssociations**: Value to indicate if the Independant Associations should be included. Default is false. (Only for EF <=6.2, since EF Core does not support many-to-many relations without a join entity. Check [this](https://github.com/aspnet/EntityFrameworkCore/issues/1368)).
+- **ExcludeTransactionId**: Value to indicate if the Transaction IDs should be excluded from the output and not be retrieved (default is false to include the Transaction IDs).
+- **ExcludeValidationResults**: Value to indicate if the entity validations should be avoided and excluded from the audit output. (Default is false)
 
 The following settings can be configured per entity type:
 
@@ -80,6 +120,7 @@ The following settings can be configured per entity type:
 - **OverrideProperties**: To indicate constant values to override properties on the audit logs.
 - **FormatProperties**: To indicate replacement functions for the property's values on the audit logs.
 
+> The Ignore, Override and Format settings are only applied to the **Changes** and **ColumnValues** collections on the [EventEntry](#evententry). The `Entity` object (if included) will not be affected by these settings.
 
 Change the settings for a DbContext by decorating it with the `AuditDbContext` attribute, for example:
 
@@ -187,40 +228,40 @@ The `AuditDbContext` has the following virtual methods that can be overriden to 
 - **OnScopeCreated**: Called before the EF operation execution and after the `AuditScope` creation.
 - **OnScopeSaving**: Called after the EF operation execution and before the `AuditScope` saving.
 
-This is useful to, for example, save the audit logs in the same transaction as the CRUD operation being audited, so when the audit logging fails the audited operation is rolled back.
+This is useful to, for example, save the audit logs in the same transaction as the operation being audited, so when the audit logging fails the audited operation is rolled back.
 
 ```c#
 public class MyDbContext : AuditDbContext
 {
-	public MyDbContext()
-	{
-		// Set an empty DynamicDataProvider to avoid saving on the data provider
-		AuditDataProvider = new DynamicDataProvider();
-	}
-	
-	public override void OnScopeCreated(AuditScope auditScope)
-	{
-		Database.BeginTransaction();
-	}
+    public MyDbContext()
+    {
+        // Set a NULL data provider, since log saving is done in this class 
+        AuditDataProvider = new NullDataProvider();
+    }
+    
+    public override void OnScopeCreated(AuditScope auditScope)
+    {
+        Database.BeginTransaction();
+    }
 
-	public override void OnScopeSaving(AuditScope auditScope)
-	{
-		try	
-		{
-			// ... custom log saving ...
-		}
-		catch
-		{
-			// Rollback call is not mandatory. If exception thrown, the transaction won't get commited
-			Database.CurrentTransaction.Rollback(); 
-			throw;
-		}
-		Database.CurrentTransaction.Commit();
-	}
+    public override void OnScopeSaving(AuditScope auditScope)
+    {
+        try 
+        {
+            // ... custom log saving ...
+        }
+        catch
+        {
+            // Rollback call is not mandatory. If exception thrown, the transaction won't get commited
+            Database.CurrentTransaction.Rollback(); 
+            throw;
+        }
+        Database.CurrentTransaction.Commit();
+    }
 }
 ```
 
-> Note that in the example above, since we want the event saving to be done on the `OnScopeSaving` method, we need to bypass the [Data Provider](https://github.com/thepirat000/Audit.NET#data-providers) and this can be done specifying an empty dynamic provider.
+> Note that in the example above, since we want the event saving to be done on the `OnScopeSaving` method, we need to bypass the [Data Provider](https://github.com/thepirat000/Audit.NET#data-providers) and this can be done specifying a `NullDataProvider`.
 
 ## Output
 
@@ -234,7 +275,6 @@ Audit.EntityFramework output includes:
 - Exception details
 - Transaction identifiers (to group logs that are part of the same SQL or ambient transaction)
 - Entity object graphs (optional with `IncludeEntityObjects` configuration)
-- Execution time and duration
 
 With this information, you can measure performance, observe exceptions thrown or get statistics about usage of your database.
 
@@ -250,6 +290,7 @@ The following tables describes the Audit.EntityFramework output fields:
 | **TransactionId** | string | Unique identifier for the DB transaction used on the audited operation (if any). To group events that are part of the same transaction. |
 | **AmbientTransactionId** | string | Unique identifier for the ambient transaction used on the audited operation (if any). To group events that are part of the same ambient transaction. |
 | **Entries** | Array of [EventEntry](#evententry) | Array with information about the entities affected by the audited operation |
+| **Associations** | Array of [AssociationEntry](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.EntityFramework/AssociationEntry.cs) | Independant associations changes, many-to-many relations without a join table with changes (only for EF <=6.2, not available on EF Core) |
 | **Result** | integer | Result of the SaveChanges call. Is the number of objects affected by the operation. |
 | **Success** | boolean | Boolean to indicate if the operation was successful |
 | **ErrorMessage** | string | The exception thrown details (if any) |
@@ -273,7 +314,6 @@ The following tables describes the Audit.EntityFramework output fields:
 | **OriginalValue** | string | The original value before the update |
 | **NewValue** | string | The new value after the update |
 
-
 ## Customization
 
 ### Custom fields
@@ -295,14 +335,16 @@ Another way to customize the output is by using global custom actions, please se
 
 ## Entity Framework Data Provider
 
-If you plan to store the audit logs on the same database as the audited entities, you can use the provided `EntityFrameworkDataProvider`. Use this to store the logs of each table in a an audit table with similar structure.
+If you plan to store the audit logs via EntityFramework, you can use the provided `EntityFrameworkDataProvider`. 
+Use this to store the logs on audit tables handled by EntityFramework.
 
 For example, you want to audit `Order` and `OrderItem` tables into `Audit_Order` and `Audit_OrderItem` tables respectively, 
 and the structure of the `Audit_*` tables mimic the audited table plus some fields like the event date, an action and the username:
 
 ![Audit entities](http://i.imgur.com/QvfXS9H.png)
 
-Note the audit trail tables must be mapped on the same model as the audited entities.
+> Note that, by default, the library uses the same `DbContext` audited to store the audit logs. 
+> This is not mandatory and you can provide a different _DbContext_ instance per audit event.
 
 ### EF Provider configuration
 
@@ -346,15 +388,17 @@ Mandatory:
 - **AuditTypeMapper**: A function that maps an entity type to its audited type (i.e. Order -> Audit_Order, etc). 
 
 Optional:
-- **AuditEntityAction**: A function to perform on the audit entity before saving it, for example to update specific audit properties like user name
-or the audit date. It can also be used to filter out audit entities. This function returns a boolean value to indicate whether to include the entity on the output log. 
-- **IgnoreMatchedProperties**: Set to true to avoid the property values copy from the entity to the audited entity (default is true).
+- **UseDbContext**: A function that returns the DbContext to use for storing the audit events, by default it will use the same context being audited. 
+- **AuditEntityAction**: An action to perform on the audit entity before saving it, for example to update specific audit properties like user name or the audit date. It can also be used to filter out audit entities. Make this function return a boolean value to indicate whether to include the entity on the output log. 
+- **IgnoreMatchedProperties**: Set to true to avoid the property values copy from the entity to the audited entity (default is false).
 
 ### EF Provider configuration examples
 
 The `UseEntityFramework` method provides several ways to indicate the Type Mapper and the Audit Action.
 
-You can map the audited entity to its audit trail entity by the entity name using the `AuditTypeNameMapper` method, for example to prepend `Audit_` to the entity name. 
+#### Map by type name:
+
+You can map the audited entity to its audit log entity by the entity name using the `AuditTypeNameMapper` method, for example to prepend `Audit_` to the entity name. 
 This assumes both entity types are defined on the same assembly and namespace:
 
 ```c#
@@ -368,8 +412,24 @@ Audit.Core.Configuration.Setup()
         }));
 ```
 
-If your audit trail entities implements a common interface or base class, you can use the generic version of the `AuditEntityAction` method 
+the AuditEvent (shown here as `ev`) in an instance of `AuditEventEntityFramework`. As such, it can be casted to that type or by using the helper method `ev.GetEntityFrameworkEvent()`.
+
+```c#
+Audit.Core.Configuration.Setup()
+    .UseEntityFramework(x => x
+        .AuditTypeNameMapper(typeName => "Audit_" + typeName)
+        .AuditEntityAction<IAudit>((ev, ent, auditEntity) =>
+        {
+	    var entityFrameworkEvent = ev.GetEntityFrameworkEvent();
+	    auditEntity.TransactionId = entityFrameworkEvent.TransactionId;
+        }));
+```
+
+#### Common action:
+
+If your audit log entities implements a common interface or base class, you can use the generic version of the `AuditEntityAction` method 
 to configure the action to be performed to each audit trail entity before saving:
+
 ```c#
 Audit.Core.Configuration.Setup()
     .UseEntityFramework(x => x
@@ -381,7 +441,8 @@ Audit.Core.Configuration.Setup()
         }));
 ```
 
-Use the explicit mapper to provide granular configuration per audit type:
+#### Use the explicit mapper to provide granular configuration per audit type:
+
 ```c#
 Audit.Core.Configuration.Setup()
     .UseEntityFramework(x => x
@@ -399,7 +460,8 @@ Audit.Core.Configuration.Setup()
             })));
 ```
 
-Ignore certain entities on the audit log:
+#### Ignore certain entities on the audit log:
+
 ```c#
 Audit.Core.Configuration.Setup()
     .UseEntityFramework(x => x
@@ -414,3 +476,126 @@ Audit.Core.Configuration.Setup()
                 return true;
             })));
 ```
+
+#### Custom DbContext instance:
+
+To set a custom DbContext instance for storing the audit events, for example when your Audit_* entities 
+are defined in a different database and context (i.e. `AuditDatabaseDbContext`):
+
+```c#
+Audit.Core.Configuration.Setup()
+    .UseEntityFramework(x => x
+        .UseDbContext<AuditDatabaseDbContext>()
+        .AuditTypeExplicitMapper(m => m
+            .Map<Order, Audit_Order>()
+            .AuditEntityAction<IAudit>((ev, ent, auditEntity) =>
+            {
+                auditEntity.AuditDate = DateTime.UtcNow;
+            })));
+```
+
+#### Map multiple entity types to the same audit type with independent actions:
+
+When you want to store the audit logs of different entities in the same audit table, for example:
+
+![Audit entities 2](https://i.imgur.com/oNxnhUh.png)
+
+```c#
+Audit.Core.Configuration.Setup()
+    .UseEntityFramework(ef => ef
+        .AuditTypeExplicitMapper(m => m
+            .Map<Blog, AuditLog>((blog, audit) =>
+            {
+                // Action for Blog -> AuditLog
+                audit.TableName = "Blog";
+                audit.TablePK = blog.Id;
+                audit.Title = blog.Title;
+            })
+            .Map<Post, AuditLog>((post, audit) =>
+            {
+                // Action for Post -> AuditLog
+                audit.TableName = "Post";
+                audit.TablePK = post.Id;
+                audit.Title = post.Title;
+            })
+            .AuditEntityAction<AuditLog>((evt, entry, audit) =>
+            {
+                // Common action on AuditLog
+                audit.AuditDate = DateTime.UtcNow;
+                audit.AuditAction = entry.Action;
+                audit.AuditUsername = Environment.UserName;
+            }))
+	.IgnoreMatchedProperties(true));
+```
+
+Another example for all entities mapping to a single audit log table that stores the changes in a JSON column:
+
+```c#
+Audit.Core.Configuration.Setup()
+    .UseEntityFramework(_ => _
+        .AuditTypeMapper(t => typeof(AuditLog))  
+        .AuditEntityAction<AuditLog>((ev, entry, entity) =>
+        {
+            entity.AuditData = entry.ToJson();
+            entity.EntityType = entry.EntityType.Name;
+            entity.AuditDate = DateTime.Now;
+            entity.AuditUser = Environment.UserName;
+	    entity.TablePk = entry.PrimaryKey.First().Value.ToString();
+        })
+	.IgnoreMatchedProperties(true));
+```
+
+> Note the use of `.IgnoreMatchedProperties(true)` to avoid the library trying to set properties automatically by matching names between the audited entities and the type `AuditLog`.
+
+#### Map an entity type to multiple audit types, depending on the modified entry:
+
+When you want to save audit logs to different tables for the same entity, for example, 
+if you have different audit tables per operation:
+
+```c#
+Audit.Core.Configuration.Setup() 
+    .UseEntityFramework(ef => ef.AuditTypeExplicitMapper(m => m
+        .Map<Blog>(
+            mapper: entry => entry.Action == "Update" ? typeof(Audit_Updates_Blog) : typeof(Audit_Blog), 
+            entityAction: (ev, entry, entity) =>
+            {
+                if (entity is Audit_Updates_Blog upd)
+                {
+                    // action for updates
+                }
+                else if (entity is Audit_Blog etc)
+                {
+                    // action for insert/delete
+                }
+            })
+        .AuditEntityAction<IAuditLog>((evt, entry, auditEntity) =>
+        {
+            // common action...
+        })));
+```
+
+> - Updates to `Blog` table -> Audit to `Audit_Updates_Blog` table
+> - Any other operation on `Blog` table -> Audit to `Audit_Blog` table
+
+
+# Contribute
+
+If you like this project please contribute in any of the following ways:
+
+- [Star](https://github.com/thepirat000/Audit.NET/stargazers) this project on GitHub.
+- Request a new feature or expose any bug you found by creating a [new issue](https://github.com/thepirat000/Audit.NET/issues/new).
+- Ask any questions about the library on [StackOverflow](http://stackoverflow.com/questions/ask?tags=Audit.NET).
+- Subscribe to and use the [Gitter Audit.NET channel](https://gitter.im/Audit-NET/Lobby).
+- Support the project by [becoming a Backer](https://opencollective.com/auditnet):
+[![Backer](https://opencollective.com/auditnet/tiers/backer.svg?avatarHeight=36&width=600)](https://opencollective.com/auditnet)     
+- Spread the word by blogging about it, or sharing it on social networks:
+  <p class="share-buttons">
+    <a href="https://www.facebook.com/sharer/sharer.php?u=https://nuget.org/packages/Audit.NET/&amp;t=Check+out+Audit.NET" target="_blank">
+      <img width="24" height="24" alt="Share this package on Facebook" src="https://nuget.org/Content/gallery/img/facebook.svg" / >
+    </a>
+    <a href="https://twitter.com/intent/tweet?url=https://nuget.org/packages/Audit.NET/&amp;text=Check+out+Audit.NET" target="_blank">
+      <img width="24" height="24" alt="Tweet this package" src="https://nuget.org/Content/gallery/img/twitter.svg" />
+    </a>
+  </p>
+- Make a donation via PayPal 
+[![paypal](https://img.shields.io/badge/donate-PayPal-blue.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=thepirat000%40hotmail.com&currency_code=USD&source=url)

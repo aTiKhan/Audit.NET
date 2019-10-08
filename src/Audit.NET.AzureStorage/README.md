@@ -26,17 +26,10 @@ methods on the fluent configuration. This should be done before any `AuditScope`
 
 Stores each audit event as a BLOB file with the JSON representation of the Audit Event.
 
-Configuration example:
-```c#
-Audit.Core.Configuration.DataProvider = new AzureBlobDataProvider()
-{
-    ConnectionString = "DefaultEndpointsProtocol=https;AccountName=your account;AccountKey=your key",
-    ContainerName = "event",
-    BlobNameBuilder = ev => $"{ev.StartDate:yyyy-MM}/{ev.Environment.UserName}/{Guid.NewGuid()}.json"
-};
-```
+#### Configuration examples
 
-Or by using the [fluent configuration API](https://github.com/thepirat000/Audit.NET#configuration-fluent-api) via `UseAzureBlobStorage` method:
+Using a connection string: 
+ 
 ```c#
 Audit.Core.Configuration.Setup()
     .UseAzureBlobStorage(config => config
@@ -45,16 +38,45 @@ Audit.Core.Configuration.Setup()
         .BlobNameBuilder(ev => $"{ev.StartDate:yyyy-MM}/{ev.Environment.UserName}/{Guid.NewGuid()}.json"));
 ```
 
+Using Azure Active Directory (authentication token):
+
+```c#
+Audit.Core.Configuration.Setup()
+    .UseAzureBlobStorage(config => config
+        .AzureActiveDirectory(adConfig => adConfig
+            .AccountName("your account")
+            .TenantId("your tenant ID"))
+        .ContainerName("event")
+        .BlobNameBuilder(ev => $"{Guid.NewGuid()}.json"));
+```
+
 #### Provider Options
 
-Mandatory:
-- **ConnectionString/ConnectionStringBuilder**: The Azure Storage connection string.
+##### Authentication options
 
-Optional:
-- **ContainerName/ContainerNameBuilder**: The container name to use (see the naming restrictions [here](https://docs.microsoft.com/en-us/azure/storage/storage-dotnet-how-to-use-blobs#create-a-container)). By default, "event" is used as the container name.
-- **BlobNameBuilder**: A function that takes an Audit Event and returns a unique blob name for the event. The resulting name can include path information (slash separated sub-folders). By default, a random Guid is used as the blob name.
+Depending on the authentication method, you can call one of the following two methods:
 
-##### Query events
+- **`ConnectionString()`**: To use **Account Access Key or SAS** authentication via an Azure Storage connection string.
+- **`AzureActiveDirectory()`**: To use [**Azure Active Directory**](https://docs.microsoft.com/en-us/azure/storage/common/storage-auth-aad-app) authentication via access tokens acquired automatically.
+
+##### AzureActiveDirectory configuration
+
+When using Azure Active Directory authentication you can provide the following configuration to `AzureActiveDirectory()` method:
+
+- **`AccountName()`**: The Account Name of your Azure Storage.
+- **`TenantId()`**: The Tenant ID, this is your Azure Active Directory ID. See [How to get it](https://docs.microsoft.com/en-us/azure/storage/common/storage-auth-aad-app#get-the-tenant-id-for-your-azure-active-directory).
+
+- **`AuthConnectionString()`**: (Optional) Specifies a custom connection string for the Token Provider. Check [this](https://docs.microsoft.com/en-us/azure/key-vault/service-to-service-authentication#connection-string-support) for more information.
+- **`ResouceUrl()`**: (Optional) Specifies a custom resource URL to acquire the tokens for. By default the Azure Storage resource ID `https://storage.azure.com/` is used.
+- **`EndpointSuffix()`**: (Optional) Specifies a custom DNS endpoint suffix to use for the storage services. Default is `core.windows.net`.
+- **`UseHttps()`**: (Optional) Specifies whether to use HTTPS to connect to storage service endpoints. Default is `true`.
+
+##### Container options
+
+- **`ContainerName()`/`ContainerNameBuilder`**: The container name to use (see the naming restrictions [here](https://docs.microsoft.com/en-us/rest/api/storageservices/naming-and-referencing-containers--blobs--and-metadata)). By default, "event" is used as the container name.
+- **`BlobNameBuilder`**: A function that takes an Audit Event and returns a unique blob name for the event. The resulting name can include path information (slash separated sub-folders). By default, a random Guid is used as the blob name.
+
+#### Query events
 
 This provider implements `GetEvent` and `GetEventAsync` methods to obtain an audit event by id:
 
@@ -82,7 +104,7 @@ Audit.Core.Configuration.Setup()
     .UseAzureTableStorage(_ => _
         .ConnectionString("DefaultEndpointsProtocol=https;AccountName=your account;AccountKey=your key")
         .TableName("Events")
-        .EntityMapper(e => new AuditEventTableEntity(ev)));
+        .EntityMapper(ev => new AuditEventTableEntity(ev)));
 ```
 
 You can set the entity mapper to return any class implementing [`ITableEntity`](https://docs.microsoft.com/en-us/dotnet/api/microsoft.windowsazure.storage.table.itableentity?view=azure-dotnet), as the provided default [`AuditEventTableEntity`](https://github.com/thepirat000/Audit.NET/tree/master/src/Audit.NET.AzureStorage/ConfigurationApi/AuditEventTableEntity.cs).
@@ -94,7 +116,7 @@ Audit.Core.Configuration.Setup()
         .ConnectionString("DefaultEndpointsProtocol=https;AccountName=your account;AccountKey=your key")
         .TableName("Events")
         .EntityBuilder(e => e
-            .PartitionKey($"Events{ev.StartDate:yyyyMM}")
+            .PartitionKey(ev => $"Events{ev.StartDate:yyyyMM}")
             .RowKey(ev => Guid.NewGuid().ToString())
             .Columns(c => c.FromObject(ev => new { Date = ev.StartDate, AuditEventJson = ev.ToJson() }))));
 ```
@@ -106,7 +128,7 @@ Mandatory:
 
 Optional:
 - **TableName**: The table name to use. By default, "event" is used as the table name.
-- **EntityMapper**: A function that defined a mapping from an Audit Event to a Table Entity. 
+- **EntityMapper**: A function that defines a mapping from an Audit Event to a Table Entity. 
 - **EntityBuilder**: An alternative way to dynamically specify the table entity mapping for audit events:
   - _PartitionKey_: A function of the audit event that returns the partition key to use.
   - _RowKey_: A function of the audit event that returns the row key to use.

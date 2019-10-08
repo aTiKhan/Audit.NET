@@ -14,6 +14,9 @@ using Audit.Core.Providers;
 using NUnit.Framework;
 using System.Net;
 using Newtonsoft.Json;
+using Microsoft.AspNetCore.Mvc.Abstractions;
+using System.Reflection;
+using System.Linq;
 
 namespace Audit.WebApi.UnitTest
 {
@@ -79,11 +82,15 @@ namespace Audit.WebApi.UnitTest
             request.SetupGet(r => r.Scheme).Returns("http");
             request.SetupGet(r => r.Host).Returns(new HostString("200.10.10.20:1010"));
             request.SetupGet(r => r.Path).Returns("/api/values");
+            request.SetupGet(r => r.QueryString).Returns(new QueryString(""));
+            request.SetupGet(r => r.PathBase).Returns(new PathString(""));
             request.SetupGet(r => r.Headers).Returns(new HeaderDictionary(new Dictionary<string, StringValues> { { "content-type", "application/json" } }));
             request.Setup(c => c.ContentLength).Returns(123);
 
             var httpResponse = new Mock<HttpResponse>();
             httpResponse.SetupGet(c => c.StatusCode).Returns(200);
+            httpResponse.Setup(c => c.Headers).Returns(new HeaderDictionary(new Dictionary<string, StringValues> { {"header-one", "1" }, { "header-two", "2" } }));
+
             var itemsDict = new Dictionary<object, object>();
             var httpContext = new Mock<HttpContext>();
             httpContext.SetupGet(c => c.Request).Returns(request.Object);
@@ -100,7 +107,9 @@ namespace Audit.WebApi.UnitTest
                 ActionDescriptor = new ControllerActionDescriptor()
                 {
                     ActionName = "get",
-                    ControllerName = "values"
+                    ControllerName = "values",
+                    Parameters = new List<ParameterDescriptor>(),
+                    MethodInfo = typeof(ActionFilterUnitTest).GetMethods().First()
                 }
             };
             var args = new Dictionary<string, object>()
@@ -119,6 +128,8 @@ namespace Audit.WebApi.UnitTest
                 IncludeHeaders = true,
                 IncludeModelState = true,
                 IncludeResponseBody = true,
+                IncludeRequestBody = true,
+                IncludeResponseHeaders = true,
                 EventTypeName = "TestEvent"
             };
 
@@ -139,6 +150,9 @@ namespace Audit.WebApi.UnitTest
             Assert.AreEqual("values", action.ControllerName);
             Assert.AreEqual("value1", action.ActionParameters["test1"]);
             Assert.AreEqual("this is the result", action.ResponseBody.Value);
+            Assert.AreEqual(2, action.ResponseHeaders.Count);
+            Assert.AreEqual("1", action.ResponseHeaders["header-one"]);
+            Assert.AreEqual("2", action.ResponseHeaders["header-two"]);
             Assert.AreEqual(123, action.RequestBody.Length);
             Assert.AreEqual("application/json", action.RequestBody.Type);
         }
@@ -152,6 +166,8 @@ namespace Audit.WebApi.UnitTest
             request.SetupGet(r => r.Scheme).Returns("http");
             request.SetupGet(r => r.Host).Returns(new HostString("200.10.10.20:1010"));
             request.SetupGet(r => r.Path).Returns("/api/values");
+            request.SetupGet(r => r.QueryString).Returns(new QueryString(""));
+            request.SetupGet(r => r.PathBase).Returns(new PathString(""));
             request.SetupGet(r => r.Headers).Returns(new HeaderDictionary(new Dictionary<string, StringValues> { { "content-type", "application/json" } }));
             request.Setup(c => c.ContentLength).Returns(123);
 
@@ -169,7 +185,9 @@ namespace Audit.WebApi.UnitTest
                 ActionDescriptor = new ControllerActionDescriptor()
                 {
                     ActionName = "get",
-                    ControllerName = "values"
+                    ControllerName = "values",
+                    Parameters = new List<ParameterDescriptor>(),
+                    MethodInfo = typeof(ActionFilterUnitTest).GetMethods().First()
                 }
             };
             var args = new Dictionary<string, object>();
@@ -203,6 +221,8 @@ namespace Audit.WebApi.UnitTest
             request.SetupGet(r => r.Scheme).Returns("http");
             request.SetupGet(r => r.Host).Returns(new HostString("200.10.10.20:1010"));
             request.SetupGet(r => r.Path).Returns("/api/values");
+            request.SetupGet(r => r.QueryString).Returns(new QueryString(""));
+            request.SetupGet(r => r.PathBase).Returns(new PathString(""));
             request.SetupGet(r => r.Headers).Returns(new HeaderDictionary(new Dictionary<string, StringValues>{ { "content-type", "application/json" } }));
             var httpResponse = new Mock<HttpResponse>();
             httpResponse.SetupGet(c => c.StatusCode).Returns(200);
@@ -218,7 +238,9 @@ namespace Audit.WebApi.UnitTest
                 ActionDescriptor = new ControllerActionDescriptor()
                 {
                     ActionName = "get",
-                    ControllerName = "values"
+                    ControllerName = "values",
+                    Parameters = new List<ParameterDescriptor>(),
+                    MethodInfo = typeof(ActionFilterUnitTest).GetMethods().First()
                 }
             };
             var args = new Dictionary<string, object>()
@@ -270,6 +292,8 @@ namespace Audit.WebApi.UnitTest
             request.SetupGet(r => r.Scheme).Returns("http");
             request.SetupGet(r => r.Host).Returns(new HostString("200.10.10.20:1010"));
             request.SetupGet(r => r.Path).Returns("/api/values");
+            request.SetupGet(r => r.QueryString).Returns(new QueryString(""));
+            request.SetupGet(r => r.PathBase).Returns(new PathString(""));
             request.SetupGet(r => r.Headers).Returns(new HeaderDictionary(new Dictionary<string, StringValues> { { "content-type", "application/json" } }));
             var httpResponse = new Mock<HttpResponse>();
             httpResponse.SetupGet(c => c.StatusCode).Returns(200);
@@ -285,7 +309,9 @@ namespace Audit.WebApi.UnitTest
                 ActionDescriptor = new ControllerActionDescriptor()
                 {
                     ActionName = "get",
-                    ControllerName = "values"
+                    ControllerName = "values",
+                    Parameters = new List<ParameterDescriptor>(),
+                    MethodInfo = typeof(ActionFilterUnitTest).GetMethods().First()
                 }
             };
             var args = new Dictionary<string, object>()

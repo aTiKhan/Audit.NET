@@ -13,8 +13,34 @@ namespace Audit.Integration.AspNetCore.Controllers
         public string Title { get; set; }
     }
 
+    public class UploadModel
+    {
+        public string ImageCaption { set; get; }
+        public string ImageDescription { set; get; }
+        public IFormFile MyImage { set; get; }
+    }
+
     public class MvcController : Controller
     {
+        [HttpGet]
+        [Route("mvc/ignoreme")]
+        [Audit(IncludeHeaders = true, IncludeModel = true)]
+        [AuditIgnore]
+        public async Task<ActionResult> IgnoreMe()
+        {
+            await Task.Delay(1);
+            return View("Index", new TestModelClass());
+        }
+
+        [HttpGet]
+        [Route("mvc/ignoreparam")]
+        [Audit(IncludeHeaders = true, IncludeModel = true)]
+        public async Task<ActionResult> IgnoreParam(int id, [AuditIgnore]string secret)
+        {
+            await Task.Delay(1);
+            return View("Index", new TestModelClass());
+        }
+
         // GET: test/abc
         [Audit(IncludeHeaders = true, IncludeModel = true)]
         [Route("test/{title}")]
@@ -23,15 +49,18 @@ namespace Audit.Integration.AspNetCore.Controllers
             await Task.Delay(1);
             if (title == "666")
             {
-                throw new Exception("this is a test exception");
+                throw new Exception("*************** THIS IS A TEST EXCEPTION **************");
             }
             return View(new TestModelClass(){Title = title});
         }
 
         // GET: Mvc/Details/5
+        [Audit.WebApi.AuditIgnore]
+        [HttpGet]
+        [Route("mvc/details/{id}")]
         public ActionResult Details(int id)
         {
-            return View();
+            return View("Index", new TestModelClass() { Title = id.ToString() });
         }
 
         // GET: Mvc/Create

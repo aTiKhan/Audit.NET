@@ -8,12 +8,12 @@ namespace Audit.Core
     /// <summary>
     /// Represents the output of the audit process
     /// </summary>
-    public class AuditEvent
+    public class AuditEvent : IAuditOutput
     {
         /// <summary>
         /// The enviroment information
         /// </summary>
-        [JsonProperty]
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public AuditEventEnvironment Environment { get; set; }
 
         /// <summary>

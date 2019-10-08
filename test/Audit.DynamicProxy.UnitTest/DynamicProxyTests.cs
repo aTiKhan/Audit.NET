@@ -18,7 +18,7 @@ namespace Audit.DynamicProxy.UnitTest
             var inserts = new List<AuditEvent>();
             var replaces = new List<AuditEvent>();
             Audit.Core.Configuration.Setup()
-                .UseDynamicProvider(config => config.OnInsert(ev =>
+                .Use(config => config.OnInsert(ev =>
                 {
                     inserts.Add(JsonConvert.DeserializeObject(ev.ToJson(), ev.GetType()) as AuditEvent);
                 })
@@ -46,7 +46,7 @@ namespace Audit.DynamicProxy.UnitTest
         {
             var logs = new List<AuditEvent>();
             Audit.Core.Configuration.Setup()
-                .UseDynamicProvider(config => config.OnInsert(ev =>
+                .Use(config => config.OnInsert(ev =>
                 {
                     logs.Add(ev);
                 }))
@@ -116,11 +116,11 @@ namespace Audit.DynamicProxy.UnitTest
         }
 
         [Test]
-        public async Task Test_Out_Ref_Ignore()
+        public void Test_Out_Ref_Ignore()
         {
             var logs = new List<AuditEvent>();
             Audit.Core.Configuration.Setup()
-                .UseDynamicProvider(config => config.OnInsert(ev =>
+                .Use(config => config.OnInsert(ev =>
                 {
                     logs.Add(ev);
                 }));
@@ -148,7 +148,7 @@ namespace Audit.DynamicProxy.UnitTest
         {
             var logs = new List<string>();
             Audit.Core.Configuration.Setup()
-                .UseDynamicProvider(config => config.OnInsert(ev =>
+                .Use(config => config.OnInsert(ev =>
                 {
                     logs.Add(ev.EventType);
                 }));
@@ -179,7 +179,7 @@ namespace Audit.DynamicProxy.UnitTest
             Assert.AreEqual(guid.ToUpper(), str);
             Assert.AreEqual("test", x.GetSomePropValue());
             provider.Verify(p => p.InsertEvent(It.IsAny<AuditEvent>()), Times.Once);
-            provider.Verify(p => p.InsertEvent(It.Is<AuditEvent>(ev => ev.GetAuditInterceptEvent().Arguments[0].Value == guid)), Times.Once);
+            provider.Verify(p => p.InsertEvent(It.Is<AuditEvent>(ev => (string)ev.GetAuditInterceptEvent().Arguments[0].Value == guid)), Times.Once);
         }
 
         [Test]

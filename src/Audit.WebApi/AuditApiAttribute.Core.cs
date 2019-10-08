@@ -18,6 +18,10 @@ namespace Audit.WebApi
         private AuditApiAdapter _adapter = new AuditApiAdapter();
 
         /// <summary>
+        /// Gets or sets a value indicating whether the output should include the Http Response Headers.
+        /// </summary>
+        public bool IncludeResponseHeaders { get; set; }
+        /// <summary>
         /// Gets or sets a value indicating whether the output should include the Http Request Headers.
         /// </summary>
         public bool IncludeHeaders { get; set; }
@@ -66,16 +70,21 @@ namespace Audit.WebApi
         /// </summary>
         public bool SerializeActionParameters { get; set; }
 
+        public AuditApiAttribute()
+        {
+            this.Order = int.MinValue;
+        }
+
         public override async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
         {
-            if (Configuration.AuditDisabled)
+            if (Configuration.AuditDisabled || _adapter.ActionIgnored(context))
             {
                 await next.Invoke();
                 return;
             }
             await _adapter.BeforeExecutingAsync(context, IncludeHeaders, IncludeRequestBody, SerializeActionParameters, EventTypeName);
             var actionExecutedContext = await next.Invoke();
-            await _adapter.AfterExecutedAsync(actionExecutedContext, IncludeModelState, ShouldIncludeResponseBody(actionExecutedContext));
+            await _adapter.AfterExecutedAsync(actionExecutedContext, IncludeModelState, ShouldIncludeResponseBody(actionExecutedContext), IncludeResponseHeaders);
         }
 
         private bool ShouldIncludeResponseBody(ActionExecutedContext context)

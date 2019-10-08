@@ -1,4 +1,4 @@
-﻿#if NETSTANDARD1_5 || NETSTANDARD2_0 || NET461
+﻿#if NETSTANDARD1_5 || NETSTANDARD2_0 || NETSTANDARD2_1 || NET461
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 #elif NET45
@@ -13,7 +13,6 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Data.Common;
-using System.Data.SqlClient;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -31,7 +30,7 @@ namespace Audit.EntityFramework
         private static readonly ConcurrentDictionary<Type, Dictionary<string, AuditOverrideAttribute>> PropertiesOverrideAttrCache = new ConcurrentDictionary<Type, Dictionary<string, AuditOverrideAttribute>>();
 
         // AuditDbContext Attribute cache
-        private static ConcurrentDictionary<Type, AuditDbContextAttribute> _auditAttributeCache = new ConcurrentDictionary<Type, AuditDbContextAttribute>();
+        private static readonly ConcurrentDictionary<Type, AuditDbContextAttribute> _auditAttributeCache = new ConcurrentDictionary<Type, AuditDbContextAttribute>();
 
         /// <summary>
         /// Sets the configuration values from attribute, local and global
@@ -49,8 +48,10 @@ namespace Audit.EntityFramework
 
             context.Mode = attrConfig?.Mode ?? localConfig?.Mode ?? globalConfig?.Mode ?? AuditOptionMode.OptOut;
             context.IncludeEntityObjects = attrConfig?.IncludeEntityObjects ?? localConfig?.IncludeEntityObjects ?? globalConfig?.IncludeEntityObjects ?? false;
+            context.ExcludeValidationResults = attrConfig?.ExcludeValidationResults ?? localConfig?.ExcludeValidationResults ?? globalConfig?.ExcludeValidationResults ?? false;
             context.AuditEventType = attrConfig?.AuditEventType ?? localConfig?.AuditEventType ?? globalConfig?.AuditEventType;
             context.EntitySettings = MergeEntitySettings(attrConfig?.EntitySettings, localConfig?.EntitySettings, globalConfig?.EntitySettings);
+            context.ExcludeTransactionId = attrConfig?.ExcludeTransactionId ?? localConfig?.ExcludeTransactionId ?? globalConfig?.ExcludeTransactionId ?? false;
 #if NET45
             context.IncludeIndependantAssociations = attrConfig?.IncludeIndependantAssociations ?? localConfig?.IncludeIndependantAssociations ?? globalConfig?.IncludeIndependantAssociations ?? false;
 #endif
@@ -198,12 +199,18 @@ namespace Audit.EntityFramework
         }
 
         // Determines whether to include the entity on the audit log or not
-        private bool IncludeEntity(IAuditDbContext context, Type type, AuditOptionMode mode)
+        private bool IncludeEntity(IAuditDbContext context, object entity, AuditOptionMode mode)
         {
+            var type = entity.GetType();
 #if NET45
             type = ObjectContext.GetObjectType(type);
+#else
+            if (type.FullName.StartsWith("Castle.Proxies."))
+            {
+                type = type.GetTypeInfo().BaseType;
+            }
 #endif
-            bool? result = EnsureEntitiesIncludeIgnoreAttrCache(type); //true:excluded false=ignored null=unknown
+            bool ? result = EnsureEntitiesIncludeIgnoreAttrCache(type); //true:excluded false=ignored null=unknown
             if (result == null)
             {
                 // No static attributes, check the filters
@@ -226,12 +233,12 @@ namespace Audit.EntityFramework
         {
             if (!EntitiesIncludeIgnoreAttrCache.ContainsKey(type))
             {
-                var includeAttr = type.GetTypeInfo().GetCustomAttribute(typeof(AuditIncludeAttribute));
+                var includeAttr = type.GetTypeInfo().GetCustomAttribute(typeof(AuditIncludeAttribute), true);
                 if (includeAttr != null)
                 {
                     EntitiesIncludeIgnoreAttrCache[type] = true; // Type Included by IncludeAttribute
                 }
-                else if (type.GetTypeInfo().GetCustomAttribute(typeof(AuditIgnoreAttribute)) != null)
+                else if (type.GetTypeInfo().GetCustomAttribute(typeof(AuditIgnoreAttribute), true) != null)
                 {
                     EntitiesIncludeIgnoreAttrCache[type] = false; // Type Ignored by IgnoreAttribute
                 }
@@ -250,7 +257,7 @@ namespace Audit.EntityFramework
                 var ignoredProps = new HashSet<string>();
                 foreach(var prop in type.GetTypeInfo().GetProperties())
                 {
-                    var ignoreAttr = prop.GetCustomAttribute(typeof(AuditIgnoreAttribute));
+                    var ignoreAttr = prop.GetCustomAttribute(typeof(AuditIgnoreAttribute), true);
                     if (ignoreAttr != null)
                     {
                         ignoredProps.Add(prop.Name);
@@ -275,7 +282,7 @@ namespace Audit.EntityFramework
                 var overrideProps = new Dictionary<string, AuditOverrideAttribute>();
                 foreach (var prop in type.GetTypeInfo().GetProperties())
                 {
-                    var overrideAttr = prop.GetCustomAttribute<AuditOverrideAttribute>();
+                    var overrideAttr = prop.GetCustomAttribute<AuditOverrideAttribute>(true);
                     if (overrideAttr != null)
                     {
                         overrideProps[prop.Name] = overrideAttr;
@@ -336,8 +343,10 @@ namespace Audit.EntityFramework
         {
             var typeName = context.GetType().Name;
             var eventType = context.AuditEventType?.Replace("{context}", typeName).Replace("{database}", efEvent.Database) ?? typeName;
-            var auditEfEvent = new AuditEventEntityFramework();
-            auditEfEvent.EntityFrameworkEvent = efEvent;
+            var auditEfEvent = new AuditEventEntityFramework
+            {
+                EntityFrameworkEvent = efEvent
+            };
             var scope = AuditScope.Create(eventType, null, null, EventCreationPolicy.Manual, context.AuditDataProvider, auditEfEvent, 3);
             if (context.ExtraFields != null)
             {
@@ -357,8 +366,10 @@ namespace Audit.EntityFramework
         {
             var typeName = context.GetType().Name;
             var eventType = context.AuditEventType?.Replace("{context}", typeName).Replace("{database}", efEvent.Database) ?? typeName;
-            var auditEfEvent = new AuditEventEntityFramework();
-            auditEfEvent.EntityFrameworkEvent = efEvent;
+            var auditEfEvent = new AuditEventEntityFramework
+            {
+                EntityFrameworkEvent = efEvent
+            };
             var scope = await AuditScope.CreateAsync(eventType, null, null, EventCreationPolicy.Manual, context.AuditDataProvider, auditEfEvent, 3);
             if (context.ExtraFields != null)
             {
@@ -375,7 +386,7 @@ namespace Audit.EntityFramework
         /// <summary>
         /// Gets the modified entries to process.
         /// </summary>
-#if NETSTANDARD1_5 || NETSTANDARD2_0 || NET461
+#if NETSTANDARD1_5 || NETSTANDARD2_0 || NETSTANDARD2_1 || NET461
         public List<EntityEntry> GetModifiedEntries(IAuditDbContext context)
 #elif NET45
         public List<DbEntityEntry> GetModifiedEntries(IAuditDbContext context)
@@ -384,7 +395,7 @@ namespace Audit.EntityFramework
             return context.DbContext.ChangeTracker.Entries()
                 .Where(x => x.State != EntityState.Unchanged
                          && x.State != EntityState.Detached
-                         && IncludeEntity(context, x.Entity.GetType(), context.Mode))
+                         && IncludeEntity(context, x.Entity, context.Mode))
                 .ToList();
         }
 
@@ -406,10 +417,26 @@ namespace Audit.EntityFramework
 
         public string GetClientConnectionId(DbConnection connection)
         {
+            if (connection == null)
+            {
+                return null;
+            }
+#if NETSTANDARD1_5 || NETSTANDARD2_0 || NETSTANDARD2_1
+            try
+            {
+                var connId = ((connection as dynamic).ClientConnectionId) as Guid?;
+                return connId.HasValue && !connId.Value.Equals(Guid.Empty) ? connId.Value.ToString() : null;
+            }
+            catch (Microsoft.CSharp.RuntimeBinder.RuntimeBinderException)
+            {
+                return null;
+            }
+#else
             // Get the connection id (returns NULL if the connection is not open)
-            var sqlConnection = connection as SqlConnection;
+            var sqlConnection = connection as System.Data.SqlClient.SqlConnection;
             var connId = sqlConnection?.ClientConnectionId;
-            return connId.HasValue && !connId.Equals(Guid.Empty) ? connId.Value.ToString() : null;
+            return connId.HasValue && !connId.Value.Equals(Guid.Empty) ? connId.Value.ToString() : null;
+#endif
         }
 
         /// <summary>

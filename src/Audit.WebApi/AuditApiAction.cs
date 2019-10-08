@@ -1,17 +1,20 @@
 ﻿using System.Collections.Generic;
+using Audit.Core;
 using Newtonsoft.Json;
 
 namespace Audit.WebApi
 {
-    public class AuditApiAction
+    public class AuditApiAction : IAuditOutput
     {
+        [JsonProperty(Order = -1, NullValueHandling = NullValueHandling.Ignore)]
+        public string TraceId { get; set; }
         [JsonProperty(Order = 0)]
         public string HttpMethod { get; set; }
-        [JsonProperty(Order = 5)]
+        [JsonProperty(Order = 5, NullValueHandling = NullValueHandling.Ignore)]
         public string ControllerName { get; set; }
-        [JsonProperty(Order = 10)]
+        [JsonProperty(Order = 10, NullValueHandling = NullValueHandling.Ignore)]
         public string ActionName { get; set; }
-        [JsonProperty(Order = 15)]
+        [JsonProperty(Order = 15, NullValueHandling = NullValueHandling.Ignore)]
         public IDictionary<string, object> ActionParameters { get; set; }
         [JsonProperty(Order = 17)]
         public IDictionary<string, string> FormVariables { get; set; }
@@ -31,11 +34,34 @@ namespace Audit.WebApi
         public BodyContent ResponseBody { get; set; }
         [JsonProperty(Order = 45, NullValueHandling = NullValueHandling.Ignore)]
         public IDictionary<string, string> Headers { get; set; }
+        [JsonProperty(Order = 47, NullValueHandling = NullValueHandling.Ignore)]
+        public IDictionary<string, string> ResponseHeaders { get; set; }
         [JsonProperty(Order = 50, NullValueHandling = NullValueHandling.Ignore)]
         public bool? ModelStateValid { get; set; }
         [JsonProperty(Order = 55, NullValueHandling = NullValueHandling.Ignore)]
         public IDictionary<string, string> ModelStateErrors { get; set; }
         [JsonProperty(Order = 999, NullValueHandling = NullValueHandling.Ignore)]
         public string Exception { get; set; }
+        [JsonExtensionData]
+        public Dictionary<string, object> CustomFields { get; set; } = new Dictionary<string, object>();
+#if NETSTANDARD2_0 || NETSTANDARD1_6 || NET451
+        [JsonIgnore]
+        internal bool IsMiddleware { get; set; }
+#endif
+        /// <summary>
+        /// Serializes this Audit Action as a JSON string
+        /// </summary>
+        public string ToJson()
+        {
+            return JsonConvert.SerializeObject(this, Core.Configuration.JsonSettings);
+        }
+        /// <summary>
+        /// Parses an Audit Action from its JSON string representation.
+        /// </summary>
+        /// <param name="json">JSON string with the Entity Audit Action representation.</param>
+        public static AuditApiAction FromJson(string json)
+        {
+            return JsonConvert.DeserializeObject<AuditApiAction>(json, Core.Configuration.JsonSettings);
+        }
     }
 }

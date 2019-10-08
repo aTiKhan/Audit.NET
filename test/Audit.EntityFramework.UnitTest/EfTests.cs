@@ -3,31 +3,20 @@ using Newtonsoft.Json;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
-using System.Data.Entity;
 using System.Data.Entity.Core.Common;
-using System.Data.Entity.Infrastructure;
 using System.Data.Entity.SqlServer;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using DataBaseService;
+using System.Data.Entity.Infrastructure.DependencyResolution;
 
 namespace Audit.EntityFramework.UnitTest
 {
+
     [TestFixture]
     [Category("LocalDb")]
     public class EfTests
     {
-        [OneTimeSetUp]
-        public void OneTimeSetUp()
-        {
-            DbConfiguration.Loaded += (_, a) =>
-                        {
-                //a.ReplaceService<DbProviderServices>((s, k) => SqlProviderServices.Instance);
-                a.ReplaceService<IDbConnectionFactory>((s, k) => new LocalDbConnectionFactory("mssqllocaldb"));
-                        };
-        }
-
         [SetUp]
         public void SetUp()
         {
@@ -40,6 +29,61 @@ namespace Audit.EntityFramework.UnitTest
                 .ForAnyContext().Reset();
         }
 
+        [Test]
+        public void Test_EF_CustomFields()
+        {
+            var guid = Guid.NewGuid().ToString().Substring(0, 6);
+            var evs = new List<AuditEvent>();
+            Audit.EntityFramework.Configuration.Setup()
+                .ForContext<BlogsEntities>(x => x.
+                    IncludeEntityObjects(true));
+            Audit.Core.Configuration.Setup()
+                .AuditDisabled(false)
+                .UseDynamicProvider(x => x
+                    .OnInsertAndReplace(ev =>
+                    {
+                        evs.Add(ev);
+                    }))
+                .WithCreationPolicy(EventCreationPolicy.InsertOnEnd);
+
+            Audit.Core.Configuration.AddOnCreatedAction(scope =>
+            {
+                var efEvent = scope.GetEntityFrameworkEvent();
+                efEvent.CustomFields["Additional Field On event"] = new { x = 1, y = "one" };
+                efEvent.Entries[0].CustomFields["Additional Field On entry"] = new { x = 2, y = "two" };
+            });
+
+            using (var ctx = new BlogsEntities())
+            {
+                var blog = new Blog()
+                {
+                    Title = guid
+                };
+                ctx.Blogs.Add(blog);
+                ctx.SaveChanges();
+            }
+
+            
+            var ev2 = AuditEvent.FromJson<AuditEventEntityFramework>(evs[0].ToJson());
+            var sub1 = EntityFrameworkEvent.FromJson(evs[0].GetEntityFrameworkEvent().ToJson());
+            var sub2 = EventEntry.FromJson(evs[0].GetEntityFrameworkEvent().Entries[0].ToJson());
+
+            var settings = new JsonSerializerSettings() { ReferenceLoopHandling = ReferenceLoopHandling.Ignore, NullValueHandling = NullValueHandling.Ignore };
+            Assert.AreEqual(JsonConvert.SerializeObject(evs[0].GetEntityFrameworkEvent(), settings), JsonConvert.SerializeObject(sub1, settings));
+
+            Assert.AreEqual(1, evs.Count);
+
+            Assert.AreEqual(evs[0].GetEntityFrameworkEvent().Entries[0].PrimaryKey["Id"], evs[0].GetEntityFrameworkEvent().Entries[0].ColumnValues["Id"]);
+            Assert.AreEqual(guid, evs[0].GetEntityFrameworkEvent().Entries[0].ColumnValues["Title"]);
+            Assert.AreEqual("Blogs", evs[0].GetEntityFrameworkEvent().Entries[0].Table);
+            Assert.AreEqual("dbo", evs[0].GetEntityFrameworkEvent().Entries[0].Schema.ToLower());
+            Assert.AreEqual(1, (evs[0].GetEntityFrameworkEvent().CustomFields["Additional Field On event"] as dynamic).x);
+            Assert.AreEqual("two", (evs[0].GetEntityFrameworkEvent().Entries[0].CustomFields["Additional Field On entry"] as dynamic).y);
+            Assert.AreEqual("one", (evs[0].GetEntityFrameworkEvent().CustomFields["Additional Field On event"] as dynamic).y);
+            Assert.AreEqual(2, (evs[0].GetEntityFrameworkEvent().Entries[0].CustomFields["Additional Field On entry"] as dynamic).x);
+            Assert.IsNotNull(ev2.EntityFrameworkEvent.CustomFields["Additional Field On event"]);
+            Assert.IsNotNull(ev2.EntityFrameworkEvent.Entries[0].CustomFields["Additional Field On entry"]);
+        }
 
         [Test]
         public void Test_EF_Override_Func()
@@ -59,7 +103,7 @@ namespace Audit.EntityFramework.UnitTest
                 .ForAnyContext(config => config
                     .ForEntity<Blog>(_ => _.Format(b => b.Title, t => t + "X")));
 
-            var title = Guid.NewGuid().ToString();
+            var title = Guid.NewGuid().ToString().Substring(1, 25);
             using (var ctx = new BlogsEntities())
             {
                 var blog = new Blog()
@@ -116,7 +160,7 @@ namespace Audit.EntityFramework.UnitTest
                 .ForContext<DataBaseContext>(config => config
                     .ForEntity<Blog>(_ => _.Override<string>("Title", null)));
 
-            var title = Guid.NewGuid().ToString();
+            var title = Guid.NewGuid().ToString().Substring(0, 25);
             using (var ctx = new BlogsEntities())
             {
                 var blog = new Blog()
@@ -152,7 +196,7 @@ namespace Audit.EntityFramework.UnitTest
                   .ForEntity<Blog>(_ => _.Ignore("BloggerName")
                                          .Override(blog => blog.Title, "******")));
 
-            var title = Guid.NewGuid().ToString();
+            var title = Guid.NewGuid().ToString().Substring(1, 25);
             using (var ctx = new BlogsEntities())
             {
                 var blog = new Blog()
@@ -211,7 +255,7 @@ namespace Audit.EntityFramework.UnitTest
                 .Reset()
                 .UseOptOut();
 
-            var title = Guid.NewGuid().ToString();
+            var title = Guid.NewGuid().ToString().Substring(1, 25);
             using (var ctx = new BlogsEntities())
             {
                 var blog = new Blog()

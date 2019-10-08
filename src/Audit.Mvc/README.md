@@ -91,6 +91,32 @@ public void Configure(IApplicationBuilder app, IHostingEnvironment env)
 }
 ```
 
+## Audit Ignore attribute
+To selectively exclude certain controllers, action methods or action parameters, you can decorate them with `AuditIgnore` attribute. 
+
+For example:
+
+```c#
+[Audit(IncludeHeaders = true, IncludeModel = true)]
+public class AccountController : Controller
+{
+    [HttpGet]
+    [AuditIgnore]
+    public IEnumerable<string> GetAccounts()
+    {
+        // this action will not be audited
+    }
+
+    [HttpPost]
+    public IEnumerable<string> PostAccount(string user, [AuditIgnore]string password)
+    {
+        // password argument will not be audited
+    }
+
+    // ...
+}
+```
+
 
 ## Output details
 
@@ -100,6 +126,7 @@ The following table describes the Audit.Mvc output fields:
 
 | Field Name | Type | Description | 
 | ------------ | ---------------- |  -------------- |
+| **TraceId** | string | A unique identifier per request |
 | **HttpMethod** | string | HTTP method (GET, POST, etc) |
 | **ControllerName** | string | The controller name |
 | **ActionName** | string | The action name |
@@ -164,6 +191,7 @@ See [Audit.NET](https://github.com/thepirat000/Audit.NET) documentation about [C
     "EndDate": "2016-08-22T18:31:23.1834012-05:00",
     "Duration": 8529,
     "Action": {
+        "TraceId": "0HLFLQP4HGFAG_00000001",
         "HttpMethod": "GET",
         "ControllerName": "Home",
         "ActionName": "Index",
@@ -199,6 +227,7 @@ See [Audit.NET](https://github.com/thepirat000/Audit.NET) documentation about [C
     "EndDate": "2016-08-22T18:31:15.1705128-05:00",
     "Duration": 15000,
     "Action": {
+        "TraceId": "0HLFLQP4HGFAG_00000002",
         "HttpMethod": "POST",
         "ControllerName": "Home",
         "ActionName": "TestPost",
@@ -240,3 +269,54 @@ See [Audit.NET](https://github.com/thepirat000/Audit.NET) documentation about [C
 }
 ```
 
+## MVC template (dotnet new)
+
+If you are creating an ASP.NET Core MVC project from scratch, you can use the 
+**dotnet new template** provided on the library [Audit.Mvc.Template](https://www.nuget.org/packages/Audit.Mvc.Template/).
+This allows to quickly generate an *audit-enabled* MVC project that can be used as a starting point for your project or as a working example.
+
+To install the template on your system, just type:
+
+```sh
+dotnet new -i Audit.Mvc.Template
+```
+
+Once you install the template, you should see it on the dotnet new templates list with the name `mvcaudit` as follows:
+
+![capture](https://i.imgur.com/awBKluE.png)
+
+You can now create a new project on the current folder by running:
+
+```sh
+dotnet new mvcaudit
+```
+
+This will create a new Asp.NET Core 2.1 project.
+
+To get help about the options:
+
+```
+dotnet new mvcaudit -h
+```
+
+# Contribute
+
+If you like this project please contribute in any of the following ways:
+
+- [Star](https://github.com/thepirat000/Audit.NET/stargazers) this project on GitHub.
+- Request a new feature or expose any bug you found by creating a [new issue](https://github.com/thepirat000/Audit.NET/issues/new).
+- Ask any questions about the library on [StackOverflow](http://stackoverflow.com/questions/ask?tags=Audit.NET).
+- Subscribe to and use the [Gitter Audit.NET channel](https://gitter.im/Audit-NET/Lobby).
+- Support the project by [becoming a Backer](https://opencollective.com/auditnet):
+[![Backer](https://opencollective.com/auditnet/tiers/backer.svg?avatarHeight=36&width=600)](https://opencollective.com/auditnet)     
+- Spread the word by blogging about it, or sharing it on social networks:
+  <p class="share-buttons">
+    <a href="https://www.facebook.com/sharer/sharer.php?u=https://nuget.org/packages/Audit.NET/&amp;t=Check+out+Audit.NET" target="_blank">
+      <img width="24" height="24" alt="Share this package on Facebook" src="https://nuget.org/Content/gallery/img/facebook.svg" / >
+    </a>
+    <a href="https://twitter.com/intent/tweet?url=https://nuget.org/packages/Audit.NET/&amp;text=Check+out+Audit.NET" target="_blank">
+      <img width="24" height="24" alt="Tweet this package" src="https://nuget.org/Content/gallery/img/twitter.svg" />
+    </a>
+  </p>
+- Buy me a coffee via [ko-fi](https://www.ko-fi.com/X8X3OBB5):
+  <br/>[![ko-fi](https://www.ko-fi.com/img/donate_sm.png)](https://ko-fi.com/X8X3OBB5)

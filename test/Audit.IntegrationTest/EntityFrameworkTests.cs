@@ -6,7 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
-#if NETCOREAPP1_0 || NETCOREAPP2_0
+#if NETCOREAPP1_0 || NETCOREAPP2_0 || NETCOREAPP2_1
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -47,7 +47,7 @@ namespace Audit.IntegrationTest
                 .ForAnyContext(config => config
                     .ForEntity<IntegrationTest.Blog>(_ => _.Format(b => b.Title, t => t + "X")));
 
-            var title = Guid.NewGuid().ToString();
+            var title = Guid.NewGuid().ToString().Substring(0, 25);
             using (var ctx = new MyTransactionalContext())
             {
                 var blog = new Blog()
@@ -83,6 +83,43 @@ namespace Audit.IntegrationTest
             Assert.AreEqual(title + "X", entries[0].Changes[0].OriginalValue);
         }
 
+#if NETCOREAPP1_0 || NETCOREAPP2_0 || NETCOREAPP2_1
+        [Test]
+        public void Test_EF_ProxiedLazyLoading()
+        {
+            var list = new List<AuditEventEntityFramework>();
+            Audit.Core.Configuration.Setup()
+                .UseDynamicProvider(x => x.OnInsertAndReplace(ev =>
+                {
+                    list.Add(ev as AuditEventEntityFramework);
+                }))
+                .WithCreationPolicy(EventCreationPolicy.InsertOnEnd);
+
+            Audit.EntityFramework.Configuration.Setup()
+                .ForContext<MyTransactionalContext>(config => config
+                    .ForEntity<IntegrationTest.Blog>(_ => _.Ignore(blog => blog.BloggerName)));
+            Audit.EntityFramework.Configuration.Setup()
+                .ForContext<MyBaseContext>(config => config
+                    .ForEntity<IntegrationTest.Blog>(_ => _.Override<string>("Title", null)));
+
+            var title = Guid.NewGuid().ToString().Substring(0, 25);
+            using (var ctx = new MyTransactionalContext())
+            {
+                var blog = ctx.Blogs.FirstOrDefault();
+                blog.Title = title;
+                ctx.SaveChanges();
+            }
+
+            Assert.AreEqual(1, list.Count);
+            var entries = list[0].EntityFrameworkEvent.Entries;
+            Assert.IsTrue(entries[0].GetEntry().Entity.GetType().FullName.StartsWith("Castle.Proxies."));
+            Assert.AreEqual(1, entries.Count);
+            Assert.AreEqual("Update", entries[0].Action);
+            Assert.IsFalse(entries[0].ColumnValues.ContainsKey("BloggerName"));
+            Assert.AreEqual(title, entries[0].ColumnValues["Title"]);
+        }
+#endif
+
         [Test]
         public void Test_EF_IgnoreOverride_CheckCrossContexts()
         {
@@ -101,7 +138,7 @@ namespace Audit.IntegrationTest
                 .ForContext<MyBaseContext>(config => config
                     .ForEntity<IntegrationTest.Blog>(_ => _.Override<string>("Title", null)));
 
-            var title = Guid.NewGuid().ToString();
+            var title = Guid.NewGuid().ToString().Substring(0, 25);
             using (var ctx = new MyTransactionalContext())
             {
                 var blog = new Blog()
@@ -113,7 +150,7 @@ namespace Audit.IntegrationTest
                 ctx.SaveChanges();
             }
 
-            Assert.AreEqual(1, list.Count);
+             Assert.AreEqual(1, list.Count);
             var entries = list[0].EntityFrameworkEvent.Entries;
             Assert.AreEqual(1, entries.Count);
             Assert.AreEqual("Insert", entries[0].Action);
@@ -139,7 +176,7 @@ namespace Audit.IntegrationTest
               .ForAnyContext(config => config
                   .ForEntity<IntegrationTest.Blog>(_ => _.Override<string>("Title", null)));
 
-            var title = Guid.NewGuid().ToString();
+            var title = Guid.NewGuid().ToString().Substring(0, 25);
             using (var ctx = new MyTransactionalContext())
             {
                 var blog = new Blog()
@@ -290,7 +327,7 @@ namespace Audit.IntegrationTest
             Assert.AreEqual(1, logs.Count);
             Assert.AreEqual(1, logs[0].GetEntityFrameworkEvent().Entries.Count);
             Assert.AreEqual("Blogs", logs[0].GetEntityFrameworkEvent().Entries[0].Table);
-#if NET451
+#if NET452
             Assert.IsTrue(logs[0].Environment.CallingMethodName.Contains(new System.Diagnostics.StackTrace().GetFrame(0).GetMethod().Name));
 #endif
         }
@@ -359,12 +396,12 @@ namespace Audit.IntegrationTest
             }
 
             Assert.AreEqual(3, logs.Count);
-#if NET451
+#if NET452
             Assert.IsTrue(logs[0].Environment.CallingMethodName.Contains(new System.Diagnostics.StackTrace().GetFrame(0).GetMethod().Name));
 #endif
         }
 
-#if NETCOREAPP1_0 || NETCOREAPP2_0
+#if NETCOREAPP1_0 || NETCOREAPP2_0 || NETCOREAPP2_1
         private IDbContextTransaction GetCurrentTran(DbContext context)
         {
             var dbtxmgr = context.GetInfrastructure().GetService<IDbContextTransactionManager>();

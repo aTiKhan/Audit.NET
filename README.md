@@ -1,22 +1,21 @@
 # Audit.NET
 
+<sub>Quick navigation</sub><br/>
 **[USAGE](#usage) | [OUTPUT](#output) | [CUSTOMIZATION](#custom-fields-and-comments) | [DATA PROVIDERS](#data-providers) | [CREATION POLICY](#event-creation-policy) | [CONFIGURATION](#configuration) | [EXTENSIONS](#extensions)**
 
+<sub>issues</sub> | <sub>chat / support</sub> | <sub>donations</sub>
+------------ | ---------------- |  --------------
+[![issues-open](https://img.shields.io/github/issues-raw/thepirat000/Audit.NET.svg?label=open)](https://github.com/thepirat000/Audit.NET/issues)[![issues-closed](https://img.shields.io/github/issues-closed-raw/thepirat000/Audit.NET.svg?label=closed)](https://github.com/thepirat000/Audit.NET/issues) | [![Gitter](https://img.shields.io/gitter/room/Audit.NET/Lobby.svg?label=english)](https://gitter.im/Audit-NET/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=body_badge) [![Gitter](https://img.shields.io/gitter/room/Audit.NET/Audit.NET-Spanish.svg?label=español)](https://gitter.im/Audit-NET/Audit.NET-Spanish?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=body_badge) | [![backers](https://opencollective.com/auditnet/tiers/backer/badge.svg?label=backer&color=brightgreen)](https://opencollective.com/auditnet) [![paypal](https://img.shields.io/badge/donate-PayPal-blue.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=thepirat000%40hotmail.com&currency_code=USD&source=url)
 
-[![Gitter](https://badges.gitter.im/Audit-NET/Lobby.svg)](https://gitter.im/Audit-NET/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=body_badge)     
-[![fede](https://img.shields.io/twitter/follow/thepirat000.svg?style=social&label=Follow)](https://twitter.com/intent/follow?screen_name=thepirat000) 
-[![issues-open](https://img.shields.io/github/issues-raw/thepirat000/Audit.NET/.svg)](https://github.com/thepirat000/Audit.NET/issues)
-[![issues-closed](https://img.shields.io/github/issues-closed-raw/thepirat000/Audit.NET/.svg)](https://github.com/thepirat000/Audit.NET/issues)
-
-An extensible framework to audit executing operations in .NET including support for .NET Framework ≥ 4.5 and NetCore ≥ 1.0 (NetStandard 1.3).
+An extensible framework to audit executing operations in .NET and .NET Core.
 
 Generate [audit logs](https://en.wikipedia.org/wiki/Audit_trail) with evidence for reconstruction and examination of activities that have affected specific operations or procedures. 
 
 With Audit.NET you can generate tracking information about operations being executed. It gathers environmental information such as the caller user id, machine name, method name, exceptions, including execution time and duration, and exposing an extensible mechanism to enrich the logs and handle the audit output.
 
-Output [extensions](#extensions) are provided to log to json Files, Event Log, [SQL](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.SqlServer/README.md), [MySQL](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.MySql/README.md), [PostgreSQL](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.PostgreSql/README.md), [MongoDB](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.MongoDB/README.md), [AzureBlob](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.AzureStorage/README.md), [DocumentDB](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.AzureDocumentDB/README.md), [Redis](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.Redis/README.md) or [Elasticsearch](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.ElasticSearch/README.md). 
+[**Output extensions**](#storage-providers) are provided to log to [JSON Files](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET/Providers/FileDataProvider.cs), [Event Log](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET/Providers/EventLogDataProvider.cs), [SQL](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.SqlServer/README.md), [MySQL](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.MySql/README.md), [PostgreSQL](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.PostgreSql/README.md), [MongoDB](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.MongoDB/README.md), [AzureBlob](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.AzureStorage/README.md), [DocumentDB](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.AzureDocumentDB/README.md), [Redis](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.Redis/README.md), [Elasticsearch](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.ElasticSearch/README.md), [DynamoDB](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.DynamoDB/README.md), [UDP datagrams](https://github.com/thepirat000/Audit.NET/tree/master/src/Audit.NET.Udp/README.md) and more. 
 
-Also extensions to audit different systems are provided, such as [Entity Framework](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.EntityFramework/README.md), [MVC](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.Mvc/README.md), [WebAPI](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.WebApi/README.md), [WCF](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.WCF/README.md) and [SignalR](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.SignalR/README.md).
+[**Interaction extensions**](#extensions) to audit different systems are provided, such as [Entity Framework](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.EntityFramework/README.md), [MVC](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.Mvc/README.md), [WebAPI](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.WebApi/README.md), [WCF](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.WCF/README.md), [File System](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.FileSystem/README.md), [SignalR](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.SignalR/README.md) and [HttpClient](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.HttpClient/README.md).
 
 ## [NuGet](https://www.nuget.org/packages/Audit.NET/)
 
@@ -34,7 +33,7 @@ Check the [CHANELOG.md](https://github.com/thepirat000/Audit.NET/blob/master/CHA
 
 ## Usage
 
-The **Audit Scope** is the central object of this framework. It encapsulates an audit event, controlling its lifecycle. 
+The **Audit Scope** is the central object of this framework. It encapsulates an audit event, controlling its life cycle. 
 The **Audit Event** is an extensible information container of an audited operation. 
 See the [audit scope statechart](#auditscope-statechart).
 
@@ -48,7 +47,6 @@ order.Status = -1;
 order.OrderItems = null;
 order = Db.OrderUpdate(order);
 ```
-
 
 To audit this operation, you can surround the code with a `using` block that creates an `AuditScope`, indicating a target object to track:
 
@@ -81,6 +79,8 @@ using (var scope = AuditScope.Create(options))
     // ...
 }
 ```
+
+> When using the [extensions](#extensions) that logs interactions with different systems, like [Audit.EntityFramework](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.EntityFramework/README.md), [Audit.WebApi](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.WebApi/README.md), etc. you don't need to explicitly create the `AuditScope` or `AuditEvent`, they are created internally by the extension.
 
 ### Simple logging
 
@@ -131,9 +131,6 @@ public async Task SaveOrderAsync(Order order)
     {
         // async scope creation
         auditScope = await AuditScope.CreateAsync("order", () => order);
-                
-        // async manual saving
-        await auditScope.SaveAsync(); 
     }
     finally
     {
@@ -158,34 +155,34 @@ An example of the output in JSON:
 
 ```javascript
 {
-	"EventType": "Order:Update",
-	"Environment": {
-		"UserName": "Federico",
-		"MachineName": "HP",
-		"DomainName": "HP",
-		"CallingMethodName": "Audit.UnitTest.AuditTests.TestUpdate()",
-		"Exception": null,
-		"Culture": "en-GB"
-	},
-	"StartDate": "2016-08-23T11:33:14.653191-05:00",
-	"EndDate": "2016-08-23T11:33:23.1820786-05:00",
-	"Duration": 8529,
-	"Target": {
-		"Type": "Order",
-		"Old": {
-			"OrderId": "39dc0d86-d5fc-4d2e-b918-fb1a97710c99",
-			"Status": 2,
-			"OrderItems": [{
-				"Sku": "1002",
-				"Quantity": 3.0
-			}]
-		},
-		"New": {
-			"OrderId": "39dc0d86-d5fc-4d2e-b918-fb1a97710c99",
-			"Status": -1,
-			"OrderItems": null
-		}
-	}
+    "EventType": "Order:Update",
+    "Environment": {
+        "UserName": "Federico",
+        "MachineName": "HP",
+        "DomainName": "HP",
+        "CallingMethodName": "Audit.UnitTest.AuditTests.TestUpdate()",
+        "Exception": null,
+        "Culture": "en-GB"
+    },
+    "StartDate": "2016-08-23T11:33:14.653191-05:00",
+    "EndDate": "2016-08-23T11:33:23.1820786-05:00",
+    "Duration": 8529,
+    "Target": {
+        "Type": "Order",
+        "Old": {
+            "OrderId": "39dc0d86-d5fc-4d2e-b918-fb1a97710c99",
+            "Status": 2,
+            "OrderItems": [{
+                "Sku": "1002",
+                "Quantity": 3.0
+            }]
+        },
+        "New": {
+            "OrderId": "39dc0d86-d5fc-4d2e-b918-fb1a97710c99",
+            "Status": -1,
+            "OrderItems": null
+        }
+    }
 }
 ```
 
@@ -227,7 +224,7 @@ Field Name | Type | Description
 
 The `AuditScope` object provides two methods to extend the event output.
 
-- Use `SetCustomField()` method to add any object as a custom field of the event.
+- Use `SetCustomField()` method to add any object as an extra field to the event.
 - Use `Comment()` to add textual comments to the event's `Comments` array.
 
 For example:
@@ -284,33 +281,33 @@ The output of the previous examples would be:
 
 ```javascript
 {
-	"EventType": "Order:Update",
-	"Environment": {
-		"UserName": "Federico",
-		"MachineName": "HP",
-		"DomainName": "HP",
-		"CallingMethodName": "Audit.UnitTest.AuditTests.TestUpdate()",
-		"Exception": null,
-		"Culture": "en-GB"
-	},
-	"Target": {
-		"Type": "Order",
-		"Old": {
-			"OrderId": "39dc0d86-d5fc-4d2e-b918-fb1a97710c99",
-			"Status": 2,
-			
-		},
-		"New": {
-			"OrderId": "39dc0d86-d5fc-4d2e-b918-fb1a97710c99",
-			"Status": -1,
-			
-		}
-	},
-	"ReferenceId": "39dc0d86-d5fc-4d2e-b918-fb1a97710c99",           // <-- Custom Field
-	"Comments": ["Status Updated to Cancelled"],                     // <-- Comments
-	"StartDate": "2016-08-23T11:34:44.656101-05:00",
-	"EndDate": "2016-08-23T11:34:55.1810821-05:00",
-	"Duration": 8531
+    "EventType": "Order:Update",
+    "Environment": {
+        "UserName": "Federico",
+        "MachineName": "HP",
+        "DomainName": "HP",
+        "CallingMethodName": "Audit.UnitTest.AuditTests.TestUpdate()",
+        "Exception": null,
+        "Culture": "en-GB"
+    },
+    "Target": {
+        "Type": "Order",
+        "Old": {
+            "OrderId": "39dc0d86-d5fc-4d2e-b918-fb1a97710c99",
+            "Status": 2,
+            
+        },
+        "New": {
+            "OrderId": "39dc0d86-d5fc-4d2e-b918-fb1a97710c99",
+            "Status": -1,
+            
+        }
+    },
+    "ReferenceId": "39dc0d86-d5fc-4d2e-b918-fb1a97710c99",           // <-- Custom Field
+    "Comments": ["Status Updated to Cancelled"],                     // <-- Comments
+    "StartDate": "2016-08-23T11:34:44.656101-05:00",
+    "EndDate": "2016-08-23T11:34:55.1810821-05:00",
+    "Duration": 8531
 }
 ```
 
@@ -330,7 +327,7 @@ using (var scope = AuditScope.Create("SomeEvent", () => someTarget))
     }
     catch (Exception ex)
     {
-        //If an exception is thown, discard the audit event
+        //If an exception is thrown, discard the audit event
         scope.Discard();
     }
 }
@@ -427,7 +424,7 @@ AuditScope.Create(new AuditScopeOptions { DataProvider = new MyCustomDataProvide
 
 ### Dynamic data providers 
 
-As an anternative to creating a data provider class, you can define the mechanism at run time by using the `DynamicDataProvider` or `DynamicAsyncDataProvider` classes. For example:
+As an alternative to creating a data provider class, you can define the mechanism at run time by using the `DynamicDataProvider` or `DynamicAsyncDataProvider` classes. For example:
 
 ```c#
 var dataProvider = new DynamicDataProvider();
@@ -467,7 +464,7 @@ The Data Providers included are summarized in the following table:
 Data Provider | Package | Description | [Configuration API](#configuration-fluent-api) |
 ------------ | ---------------- |  ----------------------------------------------------------------- | ------------------ |
 [FileDataProvider](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET/Providers/FileDataProvider.cs) | [Audit.NET](https://github.com/thepirat000/Audit.NET) | Store the audit logs as files. Dynamically configure the directory and path. | `.UseFileLogProvider()`
-[EventLogDataProvider](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET/Providers/EventLogDataProvider.cs) | [Audit.NET](https://github.com/thepirat000/Audit.NET) | Write the audit logs to the Windows EventLog. | `.UseEventLogProvider()`
+[EventLogDataProvider](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET/Providers/EventLogDataProvider.cs) | [Audit.NET](https://github.com/thepirat000/Audit.NET) [Audit.NET.EventLog.Core](https://github.com/thepirat000/Audit.NET/tree/master/src/Audit.NET.EventLog.Core) | Write the audit logs to the Windows EventLog. | `.UseEventLogProvider()`
 [DynamicDataProvider](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET/Providers/DynamicDataProvider.cs) / [DynamicAsyncDataProvider](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET/Providers/DynamicAsyncDataProvider.cs) | [Audit.NET](https://github.com/thepirat000/Audit.NET) | Dynamically change the behavior at run-time. Define _Insert_ and a _Replace_ actions with lambda expressions. | `.UseDynamicProvider()` / `.UseDynamicAsyncProvider()`
 [SqlDataProvider](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.SqlServer/Providers/SqlDataProvider.cs) | [Audit.NET.SqlServer](https://github.com/thepirat000/Audit.NET/tree/master/src/Audit.NET.SqlServer#auditnetsqlserver) | Store the events as rows in a **MS SQL** Table, in JSON format. | `.UseSqlServer()`
 [MySqlDataProvider](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.MySql/Providers/MySqlDataProvider.cs) | [Audit.NET.MySql](https://github.com/thepirat000/Audit.NET/tree/master/src/Audit.NET.MySql#auditnetmysql) | Store the events as rows in a **MySQL** database table, in JSON format. | `.UseMySql()` 
@@ -481,6 +478,8 @@ Data Provider | Package | Description | [Configuration API](#configuration-fluen
 [Log4netDataProvider](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.log4net/Providers/Log4netDataProvider.cs) | [Audit.NET.log4net](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.log4net/README.md) | Store the audit events using [Apache log4net™](https://logging.apache.org/log4net/). | `.UseLog4net()`
 [EntityFrameworkDataProvider](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.EntityFramework/Providers/EntityFrameworkDataProvider.cs) | [Audit.EntityFramework](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.EntityFramework/README.md#entity-framework-data-provider) | Store EntityFramework audit events in the same EF context. | `.UseEntityFramework()`
 [ElasticsearchDataProvider](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.ElasticSearch/Providers/ElasticsearchDataProvider.cs) | [Audit.NET.Elasticsearch](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.ElasticSearch/README.md) | Store audit events in Elasticsearch indices. | `.UseElasticsearch()`
+[DynamoDataProvider](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.DynamoDB/Providers/DynamoDataProvider.cs) | [Audit.NET.DynamoDB](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.DynamoDB/README.md) | Store audit events in [Amazon DynamoDB™](https://aws.amazon.com/dynamodb/) tables. | `.UseDynamoDB()`
+[NLogDataProvider](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.NLog/Providers/NLogDataProvider.cs) | [Audit.NET.NLog](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.NLog/README.md) | Store the audit events using [NLog](https://nlog-project.org/). | `.UseNLog()`
 
 ## Event Creation Policy
 
@@ -541,7 +540,7 @@ You can configure Custom Actions that are executed for all the Audit Scopes in y
 
 Call the static `AddCustomAction()` method on `Audit.Core.Configuration` class to attach a custom action. 
 
-For example, to globally discard the events under centain condition:
+For example, to globally discard the events under a certain condition:
 ```c#
 Audit.Core.Configuration.AddCustomAction(ActionType.OnScopeCreated, scope =>
 {
@@ -650,13 +649,14 @@ The following packages are extensions to log interactions with different systems
 
 <a></a> | Package | Description 
 ------------ | ------------------- | ------------------
-<img src="https://i.imgur.com/Sl1hHBz.png" alt="icon" width="90" /> | **[Audit.WCF](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.WCF/README.md)** | Generate detailed server-side audit logs for **Windows Communication Foundation (WCF)** service calls, by configuring a provided behavior.
-<img src="https://i.imgur.com/T3NcXaZ.png" alt="icon" width="90"/> | **[Audit.EntityFramework](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.EntityFramework/README.md)** | Generate detailed audit logs for CRUD operations on **Entity Framework**, by inheriting from a provided `DbContext` or `IdentityDbContext`.  Includes support for EF 6 and EF 7 (EF Core).
-<img src="https://i.imgur.com/GkqLSk8.png" alt="icon" width="90"/> | **[Audit.WebApi](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.WebApi/README.md)** | Generate detailed audit logs by decorating **Web API** Methods and Controllers with an action filter attribute. Includes support for ASP.NET Core.
-<img src="https://i.imgur.com/5YjHlfd.png" alt="icon" width="90"/> | **[Audit.MVC](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.Mvc/README.md)** | Generate detailed audit logs by decorating **MVC** Actions and Controllers with an action filter attribute. Includes support for ASP.NET Core MVC.
-<img src="https://i.imgur.com/hVMM5WF.png" alt="icon" width="90"/> | **[Audit.DynamicProxy](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.DynamicProxy/README.md)** | Generate detailed audit logs for any class without changing its code by using a proxy.
-<img src="https://i.imgur.com/Fn4thn0.png" alt="icon" width="90"/> | **[Audit.FileSystem](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.FileSystem/README.md)** | Generate audit logs by intercepting file system events via FileSystemWatcher.
-<img src="https://i.imgur.com/GB2e52X.jpg" alt="icon" width="90"/> | **[Audit.SignalR](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.SignalR/README.md)** | Generate audit logs for SignalR invokations by intercepting the hub processing
+<img src="https://i.imgur.com/hVMM5WF.png" alt="icon" width="90"/> | **[Audit.DynamicProxy](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.DynamicProxy/README.md)** | Generate detailed audit logs for **any class** without changing its code by using a proxy.
+<img src="https://i.imgur.com/wdVHFoc.png" alt="icon" width="90"/> | **[Audit.EntityFramework](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.EntityFramework/README.md)** | Generate detailed audit logs for saving operations on **Entity Framework**, by inheriting from a provided `DbContext` or `IdentityDbContext`.  Includes support for EF 6 and EF 7 (EF Core).
+<img src="https://i.imgur.com/Fn4thn0.png" alt="icon" width="90"/> | **[Audit.FileSystem](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.FileSystem/README.md)** | Generate audit logs by intercepting **file system** events via FileSystemWatcher.
+<img src="https://i.imgur.com/8lV5DRk.png" alt="icon" width="90" /> | **[Audit.HttpClient](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.HttpClient/README.md)** | Generate detailed client-side audit logs for **HttpClient** REST calls, by configuring a provided message handler.
+<img src="https://i.imgur.com/ap6CeoG.png" alt="icon" width="90"/> | **[Audit.MVC](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.Mvc/README.md)** | Generate detailed audit logs by decorating **MVC** Actions and Controllers with an action filter attribute. Includes support for ASP.NET Core MVC.
+<img src="https://i.imgur.com/GB2e52X.jpg" alt="icon" width="90"/> | **[Audit.SignalR](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.SignalR/README.md)** | Generate audit logs for **SignalR** invocations by intercepting the hub processing
+<img src="https://i.imgur.com/p6knit4.png" alt="icon" width="90" /> | **[Audit.WCF](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.WCF/README.md)** | Generate detailed server-side audit logs for **Windows Communication Foundation (WCF)** service calls, by configuring a provided behavior.
+<img src="https://i.imgur.com/9go2b0f.png" alt="icon" width="90"/> | **[Audit.WebApi](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.WebApi/README.md)** | Generate detailed audit logs by decorating **Web API** Methods and Controllers with an action filter attribute, or by using a middleware. Includes support for ASP.NET Core.
 
 # Storage providers
 
@@ -666,16 +666,18 @@ Apart from the _FileLog_, _EventLog_ and _Dynamic_ event storage providers, ther
 
 <a></a> | Package | Description
 ------------- | ------------------- | ------------------
-<img src="https://i.imgur.com/lmzs1gw.png" alt="icon" width="80"/> | **[Audit.NET.SqlServer](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.SqlServer/README.md)** | Store the events as rows in a **SQL** Table, in JSON format.
-<img src="https://i.imgur.com/NHRBp86.png" alt="icon" width="80"/> | **[Audit.NET.MySql](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.MySql/README.md)** | Store the events as rows in **MySQL** database, in JSON format.
-<img src="https://i.imgur.com/ZxbDxAU.png" alt="icon" width="80"/> | **[Audit.NET.PostgreSql](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.PostgreSql/README.md)** | Store the events as rows in a **PostgreSQL** database, in JSON format.
-<img src="https://i.imgur.com/1nMVLQo.png" alt="icon" width="80"/> | **[Audit.NET.MongoDB](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.MongoDB/README.md)** | Store the events in a **Mongo DB** Collection, in BSON format.
 <img src="https://i.imgur.com/yeBZZiP.png" alt="icon" width="80"/> | **[Audit.NET.AzureDocumentDB](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.AzureDocumentDB/README.md)** | Store the events in an **Azure Document DB** Collection, in JSON format.
 <img src="https://i.imgur.com/ouaw5CX.png" alt="icon" width="80"/> | **[Audit.NET.AzureStorage](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.AzureStorage/README.md)** | Store the events in an **Azure Blob Storage** container or an **Azure Table**.
-<img src="https://i.imgur.com/pMNmmpH.png" alt="icon" width="80"/> | **[Audit.NET.Udp](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.Udp/README.md)** | Send Audit Logs as **UDP datagrams** to a network.
-<img src="https://i.imgur.com/abs6duI.png" alt="icon" width="80"/> | **[Audit.NET.Redis](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.Redis/README.md)** | Store Audit Logs in a **Redis** database as String, List, Hash, Sorted Set or publishing to a Redis PubSub channel.
-<img src="https://i.imgur.com/qxbK98k.png" alt="icon" width="80"/> | **[Audit.NET.log4net](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.log4net/README.md)** | Store the audit events using Apache log4net™.
+<img src="https://i.imgur.com/kIGe4Z5.png" alt="icon" width="80"/> | **[Audit.NET.DynamoDB](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.DynamoDB/README.md)** | Store the audit events in Amazon DynamoDB tables.
 <img src="https://i.imgur.com/PbeWVKz.png" alt="icon" width="80"/> | **[Audit.NET.Elasticsearch](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.ElasticSearch/README.md)** | Store the audit events in Elasticsearch indices.
+<img src="https://i.imgur.com/qxbK98k.png" alt="icon" width="80"/> | **[Audit.NET.log4net](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.log4net/README.md)** | Store the audit events using Apache log4net™.
+<img src="https://i.imgur.com/1nMVLQo.png" alt="icon" width="80"/> | **[Audit.NET.MongoDB](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.MongoDB/README.md)** | Store the events in a **Mongo DB** Collection, in BSON format.
+<img src="https://i.imgur.com/NHRBp86.png" alt="icon" width="80"/> | **[Audit.NET.MySql](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.MySql/README.md)** | Store the events as rows in **MySQL** database, in JSON format.
+<img src="https://i.imgur.com/qxbK98k.png" alt="icon" width="80"/> | **[Audit.NET.NLog](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.NLog/README.md)** | Store the audit events using NLog™.
+<img src="https://i.imgur.com/ZxbDxAU.png" alt="icon" width="80"/> | **[Audit.NET.PostgreSql](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.PostgreSql/README.md)** | Store the events as rows in a **PostgreSQL** database, in JSON format.
+<img src="https://i.imgur.com/abs6duI.png" alt="icon" width="80"/> | **[Audit.NET.Redis](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.Redis/README.md)** | Store Audit Logs in a **Redis** database as String, List, Hash, Sorted Set or publishing to a Redis PubSub channel.
+<img src="https://i.imgur.com/lmzs1gw.png" alt="icon" width="80"/> | **[Audit.NET.SqlServer](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.SqlServer/README.md)** | Store the events as rows in a **SQL** Table, in JSON format.
+<img src="https://i.imgur.com/FItQD9n.png" alt="icon" width="80"/> | **[Audit.NET.Udp](https://github.com/thepirat000/Audit.NET/blob/master/src/Audit.NET.Udp/README.md)** | Send Audit Logs as **UDP datagrams** to a network.
 
 # Change Log
 
@@ -689,12 +691,16 @@ If you like this project please contribute in any of the following ways:
 - Request a new feature or expose any bug you found by creating a [new issue](https://github.com/thepirat000/Audit.NET/issues/new).
 - Ask any questions about the library on [StackOverflow](http://stackoverflow.com/questions/ask?tags=Audit.NET).
 - Subscribe to and use the [Gitter Audit.NET channel](https://gitter.im/Audit-NET/Lobby).
+- Support the project by [becoming a Backer](https://opencollective.com/auditnet):
+[![Backer](https://opencollective.com/auditnet/tiers/backer.svg?avatarHeight=36&width=600)](https://opencollective.com/auditnet)     
 - Spread the word by blogging about it, or sharing it on social networks:
-<p class="share-buttons">
-  <a href="https://www.facebook.com/sharer/sharer.php?u=https://nuget.org/packages/Audit.NET/&amp;t=Check+out+Audit.NET" target="_blank">
-    <img width="24" height="24" alt="Share this package on Facebook" src="https://nuget.org/Content/gallery/img/facebook.svg" / >
-  </a>
-  <a href="https://twitter.com/intent/tweet?url=https://nuget.org/packages/Audit.NET/&amp;text=Check+out+Audit.NET" target="_blank">
-    <img width="24" height="24" alt="Tweet this package" src="https://nuget.org/Content/gallery/img/twitter.svg" />
-  </a>
-</p>
+  <p class="share-buttons">
+    <a href="https://www.facebook.com/sharer/sharer.php?u=https://nuget.org/packages/Audit.NET/&amp;t=Check+out+Audit.NET" target="_blank">
+      <img width="24" height="24" alt="Share this package on Facebook" src="https://nuget.org/Content/gallery/img/facebook.svg" / >
+    </a>
+    <a href="https://twitter.com/intent/tweet?url=https://nuget.org/packages/Audit.NET/&amp;text=Check+out+Audit.NET" target="_blank">
+      <img width="24" height="24" alt="Tweet this package" src="https://nuget.org/Content/gallery/img/twitter.svg" />
+    </a>
+  </p>
+- Make a donation via PayPal:
+[![paypal](https://img.shields.io/badge/donate-PayPal-blue.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=thepirat000%40hotmail.com&currency_code=USD&source=url)

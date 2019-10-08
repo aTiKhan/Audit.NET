@@ -1,4 +1,4 @@
-﻿#if NETCOREAPP1_0 || NETCOREAPP2_0
+﻿#if NETCOREAPP1_0 || NETCOREAPP2_0 || NETCOREAPP2_1
 using Audit.Core;
 using Audit.Core.Providers;
 using Audit.EntityFramework;
@@ -59,6 +59,7 @@ namespace Audit.IntegrationTest
                 });
             using (var db = new AuditNetTestContext())
             {
+                db.Database.EnsureCreated();
                 db.Foos.Add(new Foo());
                 Assert.Throws<DbUpdateException>(() => {
                     db.SaveChanges();
@@ -144,7 +145,7 @@ namespace Audit.IntegrationTest
         public void Test_EFDataProvider_AuditEntityDisabled()
         {
             var dp = new EntityFrameworkDataProvider();
-            dp.AuditTypeMapper = t =>
+            dp.AuditTypeMapper = (t, e) =>
             {
                 if (t == typeof(Order))
                     return typeof(OrderAudit);
@@ -187,10 +188,55 @@ namespace Audit.IntegrationTest
         }
 
         [Test]
+        public void Test_EFDataProvider_AuditEntityDisabled_CtorFluent()
+        {
+            var dp = new EntityFrameworkDataProvider(_ => _
+                .AuditTypeMapper(t =>
+                {
+                    if (t == typeof(Order))
+                        return typeof(OrderAudit);
+                    if (t == typeof(Orderline))
+                        return typeof(OrderlineAudit);
+                    return null;
+                })
+                .AuditEntityAction((ev, entry, obj) =>
+                {
+                    // return false to avoid saving
+                    return false;
+                }));
+
+            Audit.Core.Configuration.Setup()
+                .UseCustomProvider(dp);
+            var id = Guid.NewGuid().ToString();
+            using (var ctx = new AuditPerTableContext())
+            {
+                var o = new Order()
+                {
+                    Number = id,
+                    Status = "Pending",
+                    OrderLines = new Collection<Orderline>()
+                    {
+                        new Orderline() { Product = "p1: " + id, Quantity = 2 },
+                        new Orderline() { Product = "p2: " + id, Quantity = 3 }
+                    }
+                };
+                ctx.Add(o);
+                ctx.SaveChanges();
+            }
+
+            using (var ctx = new AuditPerTableContext())
+            {
+                var order = ctx.Order.Single(a => a.Number.Equals(id));
+                var orderlineAudits = ctx.OrderlineAudit.AsNoTracking().Where(a => a.OrderId.Equals(order.Id)).ToList();
+                Assert.AreEqual(0, orderlineAudits.Count);
+            }
+        }
+
+        [Test]
         public async Task Test_EFDataProvider_AuditEntityDisabledAsync()
         {
             var dp = new EntityFrameworkDataProvider();
-            dp.AuditTypeMapper = t =>
+            dp.AuditTypeMapper = (t, e) =>
             {
                 if (t == typeof(Order))
                     return typeof(OrderAudit);
@@ -232,11 +278,119 @@ namespace Audit.IntegrationTest
             }
         }
 
+
+        [Test]
+        public void Test_EFDataProvider_ProxiedLazyLoading()
+        {
+            var evs = new List<AuditEvent>();
+            Audit.Core.Configuration.AddCustomAction(ActionType.OnEventSaved, scope =>
+            {
+                evs.Add(scope.Event);
+            });
+                
+            var dp = new EntityFrameworkDataProvider();
+            dp.AuditTypeMapper = (t, e) =>
+            {
+                if (t == typeof(Order))
+                    return typeof(OrderAudit);
+                if (t == typeof(Orderline))
+                    return typeof(OrderlineAudit);
+                return null;
+            };
+
+            dp.AuditEntityAction = (ev, entry, obj) =>
+            {
+                var ab = obj as AuditBase;
+                if (ab != null)
+                {
+                    ab.AuditDate = DateTime.UtcNow;
+                    ab.UserName = ev.Environment.UserName;
+                    ab.AuditStatus = entry.Action;
+                }
+                return true;
+            };
+
+            Audit.Core.Configuration.Setup()
+                .UseCustomProvider(dp);
+            var id = Guid.NewGuid().ToString();
+            using (var ctx = new AuditPerTableContext())
+            {
+                var o = ctx.Order.FirstOrDefault();
+                o.Number = id;
+                ctx.SaveChanges();
+            }
+
+            using (var ctx = new AuditPerTableContext())
+            {
+                var orderAudits = ctx.OrderAudit.AsNoTracking().Where(a => a.Number.Equals(id)).OrderByDescending(a => a.AuditDate).ToList();
+                Assert.AreEqual(1, orderAudits.Count);
+                Assert.AreEqual("Update", orderAudits[0].AuditStatus);
+                Assert.AreEqual(id, orderAudits[0].Number);
+            }
+            Assert.AreEqual(1, evs.Count);
+            Assert.AreEqual(1, evs[0].GetEntityFrameworkEvent().Entries.Count);
+            Assert.IsTrue(evs[0].GetEntityFrameworkEvent().Entries[0].GetEntry().Entity.GetType().FullName.StartsWith("Castle.Proxies."));
+        }
+
+        [Test]
+        public async Task Test_EFDataProvider_ProxiedLazyLoading_Async()
+        {
+            var evs = new List<AuditEvent>();
+            Audit.Core.Configuration.AddCustomAction(ActionType.OnEventSaved, scope =>
+            {
+                evs.Add(scope.Event);
+            });
+
+            var dp = new EntityFrameworkDataProvider();
+            dp.AuditTypeMapper = (t, e) =>
+            {
+                if (t == typeof(Order))
+                    return typeof(OrderAudit);
+                if (t == typeof(Orderline))
+                    return typeof(OrderlineAudit);
+                return null;
+            };
+
+            dp.AuditEntityAction = (ev, entry, obj) =>
+            {
+                var ab = obj as AuditBase;
+                if (ab != null)
+                {
+                    ab.AuditDate = DateTime.UtcNow;
+                    ab.UserName = ev.Environment.UserName;
+                    ab.AuditStatus = entry.Action;
+                }
+                return true;
+            };
+
+            Audit.Core.Configuration.Setup()
+                .UseCustomProvider(dp);
+            var id = Guid.NewGuid().ToString();
+            using (var ctx = new AuditPerTableContext())
+            {
+                var o = await ctx.Order.FirstOrDefaultAsync();
+                o.Number = id;
+                await ctx.SaveChangesAsync();
+            }
+
+            using (var ctx = new AuditPerTableContext())
+            {
+                var orderAudits = await ctx.OrderAudit.AsNoTracking().Where(a => a.Number.Equals(id)).OrderByDescending(a => a.AuditDate).ToListAsync();
+                Assert.AreEqual(1, orderAudits.Count);
+                Assert.AreEqual("Update", orderAudits[0].AuditStatus);
+                Assert.AreEqual(id, orderAudits[0].Number);
+            }
+            Assert.AreEqual(1, evs.Count);
+            Assert.AreEqual(1, evs[0].GetEntityFrameworkEvent().Entries.Count);
+            Assert.IsTrue(evs[0].GetEntityFrameworkEvent().Entries[0].GetEntry().Entity.GetType().FullName.StartsWith("Castle.Proxies."));
+        }
+
+
         [Test]
         public void Test_EFDataProvider()
         {
             var dp = new EntityFrameworkDataProvider();
-            dp.AuditTypeMapper = t =>
+            dp.AuditTypeMapper = (t, e) =>
             {
                 if (t == typeof(Order))
                     return typeof(OrderAudit);
@@ -328,11 +482,210 @@ namespace Audit.IntegrationTest
         }
 
         [Test]
+        public void Test_EFDataProvider_DifferentContext()
+        {
+            var dp = new EntityFrameworkDataProvider();
+
+            dp.DbContextBuilder = ev => new AuditInDifferentContext();
+
+            dp.AuditTypeMapper = (t, e) =>
+            {
+                if (t == typeof(Order))
+                    return typeof(OrderAudit);
+                if (t == typeof(Orderline))
+                    return typeof(OrderlineAudit);
+                return null;
+            };
+
+            dp.AuditEntityAction = (ev, entry, obj) =>
+            {
+                var ab = obj as AuditBase;
+                if (ab != null)
+                {
+                    ab.AuditDate = DateTime.UtcNow;
+                    ab.UserName = ev.Environment.UserName;
+                    ab.AuditStatus = entry.Action;
+                }
+                return true;
+            };
+
+            Audit.Core.Configuration.Setup()
+                .UseCustomProvider(dp);
+            var id = Guid.NewGuid().ToString();
+            using (var ctx = new AuditedContextNoAuditTables())
+            {
+                var o = new Order()
+                {
+                    Number = id,
+                    Status = "Pending",
+                    OrderLines = new Collection<Orderline>()
+                    {
+                        new Orderline() { Product = "p1: " + id, Quantity = 2 },
+                        new Orderline() { Product = "p2: " + id, Quantity = 3 }
+                    }
+                };
+                ctx.Add(o);
+                ctx.SaveChanges();
+            }
+
+            using (var ctx = new AuditInDifferentContext())
+            {
+                var orderAudit = ctx.OrderAudit.AsNoTracking().SingleOrDefault(a => a.Number.Equals(id));
+                Assert.NotNull(orderAudit);
+                var orderlineAudits = ctx.OrderlineAudit.AsNoTracking().Where(a => a.OrderId.Equals(orderAudit.Id)).ToList();
+                Assert.AreEqual(2, orderlineAudits.Count);
+                Assert.AreEqual("p1: " + id, orderlineAudits[0].Product);
+                Assert.AreEqual("p2: " + id, orderlineAudits[1].Product);
+                Assert.AreEqual("Insert", orderAudit.AuditStatus);
+                Assert.AreEqual("Insert", orderlineAudits[0].AuditStatus);
+                Assert.AreEqual("Insert", orderlineAudits[1].AuditStatus);
+                Assert.AreEqual(orderlineAudits[0].UserName, orderlineAudits[1].UserName);
+                Assert.AreEqual(orderlineAudits[0].UserName, orderAudit.UserName);
+                Assert.IsFalse(string.IsNullOrWhiteSpace(orderlineAudits[0].UserName));
+                Assert.IsFalse(string.IsNullOrWhiteSpace(orderlineAudits[1].UserName));
+            }
+
+            using (var ctx = new AuditedContextNoAuditTables())
+            {
+                var o = ctx.Order.Single(a => a.Number.Equals(id));
+                o.Status = "Cancelled";
+                ctx.SaveChanges();
+            }
+
+            using (var ctx = new AuditInDifferentContext())
+            {
+                var orderAudits = ctx.OrderAudit.AsNoTracking().Where(a => a.Number.Equals(id)).OrderByDescending(a => a.AuditDate).ToList();
+                Assert.AreEqual(2, orderAudits.Count);
+                Assert.AreEqual("Update", orderAudits[0].AuditStatus);
+                Assert.AreEqual("Cancelled", orderAudits[0].Status);
+                Assert.AreEqual("Pending", orderAudits[1].Status);
+                Assert.AreEqual("Insert", orderAudits[1].AuditStatus);
+            }
+
+            using (var ctx = new AuditPerTableContext())
+            {
+                var order = ctx.Order.Single(a => a.Number.Equals(id));
+                var ol = ctx.Orderline.Single(a => a.OrderId.Equals(order.Id) && a.Product.StartsWith("p1"));
+                ctx.Remove(ol);
+                ctx.SaveChanges();
+            }
+
+            using (var ctx = new AuditPerTableContext())
+            {
+                var order = ctx.Order.Single(a => a.Number.Equals(id));
+                var orderlineAudits = ctx.OrderlineAudit.AsNoTracking().Where(a => a.OrderId.Equals(order.Id)).OrderByDescending(a => a.AuditDate).ToList();
+                Assert.AreEqual(3, orderlineAudits.Count);
+                Assert.AreEqual("Delete", orderlineAudits[0].AuditStatus);
+                Assert.IsTrue(orderlineAudits[0].Product.StartsWith("p1"));
+            }
+
+        }
+
+        [Test]
+        public async Task Test_EFDataProvider_DifferentContext_Async()
+        {
+            Audit.Core.Configuration.Setup()
+                .UseEntityFramework(_ => _
+                    .UseDbContext<AuditInDifferentContext>()
+                    .AuditTypeMapper(t =>
+                    {
+                        if (t == typeof(Order))
+                            return typeof(OrderAudit);
+                        if (t == typeof(Orderline))
+                            return typeof(OrderlineAudit);
+                        return null;
+                    })
+                    .AuditEntityAction((ev, entry, obj) =>
+                    {
+                        var ab = obj as AuditBase;
+                        if (ab != null)
+                        {
+                            ab.AuditDate = DateTime.UtcNow;
+                            ab.UserName = ev.Environment.UserName;
+                            ab.AuditStatus = entry.Action;
+                        }
+                        return true;
+                    }));
+
+            var id = Guid.NewGuid().ToString();
+            using (var ctx = new AuditedContextNoAuditTables())
+            {
+                var o = new Order()
+                {
+                    Number = id,
+                    Status = "Pending",
+                    OrderLines = new Collection<Orderline>()
+                    {
+                        new Orderline() { Product = "p1: " + id, Quantity = 2 },
+                        new Orderline() { Product = "p2: " + id, Quantity = 3 }
+                    }
+                };
+                await ctx.AddAsync(o);
+                await ctx.SaveChangesAsync();
+            }
+
+            using (var ctx = new AuditInDifferentContext())
+            {
+                var orderAudit = await ctx.OrderAudit.AsNoTracking().SingleOrDefaultAsync(a => a.Number.Equals(id));
+                Assert.NotNull(orderAudit);
+                var orderlineAudits = await ctx.OrderlineAudit.AsNoTracking().Where(a => a.OrderId.Equals(orderAudit.Id)).ToListAsync();
+                Assert.AreEqual(2, orderlineAudits.Count);
+                Assert.AreEqual("p1: " + id, orderlineAudits[0].Product);
+                Assert.AreEqual("p2: " + id, orderlineAudits[1].Product);
+                Assert.AreEqual("Insert", orderAudit.AuditStatus);
+                Assert.AreEqual("Insert", orderlineAudits[0].AuditStatus);
+                Assert.AreEqual("Insert", orderlineAudits[1].AuditStatus);
+                Assert.AreEqual(orderlineAudits[0].UserName, orderlineAudits[1].UserName);
+                Assert.AreEqual(orderlineAudits[0].UserName, orderAudit.UserName);
+                Assert.IsFalse(string.IsNullOrWhiteSpace(orderlineAudits[0].UserName));
+                Assert.IsFalse(string.IsNullOrWhiteSpace(orderlineAudits[1].UserName));
+            }
+
+            using (var ctx = new AuditedContextNoAuditTables())
+            {
+                var o = await ctx.Order.SingleAsync(a => a.Number.Equals(id));
+                o.Status = "Cancelled";
+                await ctx.SaveChangesAsync();
+            }
+
+            using (var ctx = new AuditInDifferentContext())
+            {
+                var orderAudits = await ctx.OrderAudit.AsNoTracking().Where(a => a.Number.Equals(id)).OrderByDescending(a => a.AuditDate).ToListAsync();
+                Assert.AreEqual(2, orderAudits.Count);
+                Assert.AreEqual("Update", orderAudits[0].AuditStatus);
+                Assert.AreEqual("Cancelled", orderAudits[0].Status);
+                Assert.AreEqual("Pending", orderAudits[1].Status);
+                Assert.AreEqual("Insert", orderAudits[1].AuditStatus);
+            }
+
+            using (var ctx = new AuditPerTableContext())
+            {
+                var order = await ctx.Order.SingleAsync(a => a.Number.Equals(id));
+                var ol = await  ctx.Orderline.SingleAsync(a => a.OrderId.Equals(order.Id) && a.Product.StartsWith("p1"));
+                ctx.Remove(ol);
+                await ctx.SaveChangesAsync();
+            }
+
+            using (var ctx = new AuditPerTableContext())
+            {
+                var order = await ctx.Order.SingleAsync(a => a.Number.Equals(id));
+                var orderlineAudits = await ctx.OrderlineAudit.AsNoTracking().Where(a => a.OrderId.Equals(order.Id)).OrderByDescending(a => a.AuditDate).ToListAsync();
+                Assert.AreEqual(3, orderlineAudits.Count);
+                Assert.AreEqual("Delete", orderlineAudits[0].AuditStatus);
+                Assert.IsTrue(orderlineAudits[0].Product.StartsWith("p1"));
+            }
+
+        }
+
+
+
+
+        [Test]
         public async Task Test_EFDataProvider_Async()
         {
             var dp = new EntityFrameworkDataProvider();
 
-            dp.AuditTypeMapper = t =>
+            dp.AuditTypeMapper = (t, e) =>
             {
                 if (t == typeof(Order))
                     return typeof(OrderAudit);
@@ -440,7 +793,7 @@ namespace Audit.IntegrationTest
                 .WithCreationPolicy(EventCreationPolicy.InsertOnEnd)
                 .WithAction(x => x.OnScopeCreated(sc =>
                 {
-                    var wcfEvent = sc.Event.GetEntityFrameworkEvent();
+                    var wcfEvent = sc.GetEntityFrameworkEvent();
                     Assert.AreEqual("Blogs", wcfEvent.Database);
                 }));
             int blogId;
@@ -668,14 +1021,20 @@ SET IDENTITY_INSERT Posts OFF
 
     public class MyTransactionalContext : MyBaseContext
     {
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        {
+            base.OnConfiguring(optionsBuilder);
+            optionsBuilder.UseLazyLoadingProxies();
+        }
+
         public override void OnScopeCreated(AuditScope auditScope)
         {
             Database.BeginTransaction();
         }
         public override void OnScopeSaving(AuditScope auditScope)
         {
-            if (auditScope.Event.GetEntityFrameworkEvent().Entries[0].ColumnValues.ContainsKey("BloggerName")
-                && auditScope.Event.GetEntityFrameworkEvent().Entries[0].ColumnValues["BloggerName"].ToString() == "ROLLBACK")
+            if (auditScope.GetEntityFrameworkEvent().Entries[0].ColumnValues.ContainsKey("BloggerName")
+                && auditScope.GetEntityFrameworkEvent().Entries[0].ColumnValues["BloggerName"].ToString() == "ROLLBACK")
             {
                 GetCurrentTran().Rollback();
             }
@@ -719,37 +1078,37 @@ SET IDENTITY_INSERT Posts OFF
     public class Blog : BaseEntity
     {
         public override int Id { get; set; }
-        public string Title { get; set; }
-        public string BloggerName { get; set; }
+        public virtual string Title { get; set; }
+        public virtual string BloggerName { get; set; }
         public virtual ICollection<Post> Posts { get; set; }
     }
     public class Post : BaseEntity
     {
         public override int Id { get; set; }
         [MaxLength(20)]
-        public string Title { get; set; }
-        public DateTime DateCreated { get; set; }
-        public string Content { get; set; }
-        public int BlogId { get; set; }
-        public Blog Blog { get; set; }
+        public virtual string Title { get; set; }
+        public virtual DateTime DateCreated { get; set; }
+        public virtual string Content { get; set; }
+        public virtual int BlogId { get; set; }
+        public virtual Blog Blog { get; set; }
     }
 
 
     public class Order
     {
-        public long Id { get; set; }
-        public string Number { get; set; }
-        public string Status { get; set; }
+        public virtual long Id { get; set; }
+        public virtual string Number { get; set; }
+        public virtual string Status { get; set; }
         public virtual ICollection<Orderline> OrderLines { get; set; }
     }
     public class Orderline
     {
-        public long Id { get; set; }
-        public string Product { get; set; }
-        public int Quantity { get; set; }
+        public virtual long Id { get; set; }
+        public virtual string Product { get; set; }
+        public virtual int Quantity { get; set; }
 
-        public long OrderId { get; set; }
-        public Order Order { get; set; }
+        public virtual long OrderId { get; set; }
+        public virtual Order Order { get; set; }
     }
 
     public abstract class AuditBase
@@ -761,22 +1120,43 @@ SET IDENTITY_INSERT Posts OFF
 
     public class OrderAudit : AuditBase
     {
-        public long Id { get; set; }
-        public string Number { get; set; }
-        public string Status { get; set; }
+        public virtual long Id { get; set; }
+        public virtual string Number { get; set; }
+        public virtual string Status { get; set; }
     }
     public class OrderlineAudit : AuditBase
     {
-        public long Id { get; set; }
-        public string Product { get; set; }
-        public int Quantity { get; set; }
-        public long OrderId { get; set; }
+        public virtual long Id { get; set; }
+        public virtual string Product { get; set; }
+        public virtual int Quantity { get; set; }
+        public virtual long OrderId { get; set; }
     }
+
+    public class AuditedContextNoAuditTables : AuditDbContext
+    {
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        {
+            optionsBuilder.UseSqlServer("data source=localhost;initial catalog=Audit;integrated security=true;");
+        }
+        public DbSet<Order> Order { get; set; }
+        public DbSet<Orderline> Orderline { get; set; }
+    }
+    public class AuditInDifferentContext : DbContext
+    {
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        {
+            optionsBuilder.UseSqlServer("data source=localhost;initial catalog=Audit;integrated security=true;");
+        }
+        public DbSet<OrderAudit> OrderAudit { get; set; }
+        public DbSet<OrderlineAudit> OrderlineAudit { get; set; }
+    }
+
     public class AuditPerTableContext : AuditDbContext
     {
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             optionsBuilder.UseSqlServer("data source=localhost;initial catalog=Audit;integrated security=true;");
+            optionsBuilder.UseLazyLoadingProxies();
         }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

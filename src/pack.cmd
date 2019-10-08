@@ -12,6 +12,8 @@ del "audit.net.sqlserver\bin\debug\*.nupkg"
 del "audit.net.mysql\bin\debug\*.nupkg"
 del "audit.entityframework\bin\debug\*.nupkg"
 del "audit.entityframework.core\bin\debug\*.nupkg"
+del "audit.entityframework.Identity\bin\debug\*.nupkg"
+del "audit.entityframework.Identity.core\bin\debug\*.nupkg"
 del "audit.WCF\bin\debug\*.nupkg"
 del "audit.net.azurestorage\bin\debug\*.nupkg"
 del "audit.dynamicproxy\bin\debug\*.nupkg"
@@ -23,6 +25,9 @@ del "Audit.SignalR\bin\debug\*.nupkg"
 del "Audit.NET.log4net\bin\debug\*.nupkg"
 del "Audit.NET.Elasticsearch\bin\debug\*.nupkg"
 del "Audit.NET.EventLog.Core\bin\debug\*.nupkg"
+del "Audit.NET.DynamoDB\bin\debug\*.nupkg"
+del "Audit.HttpClient\bin\debug\*.nupkg"
+del "Audit.NET.NLog\bin\debug\*.nupkg"
 
 copy ..\docs\Audit.NET.snk .\StrongName\Audit.NET.snk /Y
 
@@ -39,6 +44,8 @@ dotnet pack "Audit.NET.SqlServer/"
 dotnet pack "Audit.NET.MySql/"
 dotnet pack "Audit.EntityFramework/"
 dotnet pack "Audit.EntityFramework.Core/"
+dotnet pack "Audit.EntityFramework.Identity/"
+dotnet pack "Audit.EntityFramework.Identity.Core/"
 dotnet pack "Audit.Wcf/"
 dotnet pack "Audit.NET.AzureStorage/"
 dotnet pack "Audit.DynamicProxy/"
@@ -50,5 +57,9 @@ dotnet pack "Audit.SignalR/"
 dotnet pack "Audit.NET.log4net/"
 dotnet pack "Audit.NET.Elasticsearch/"
 dotnet pack "Audit.NET.EventLog.Core/"
+dotnet pack "Audit.NET.DynamoDB/"
+dotnet pack "Audit.HttpClient/"
+dotnet pack "Audit.NET.NLog/"
 
-
+ECHO.
+ECHO ADD TAG NOW !

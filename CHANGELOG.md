@@ -3,6 +3,62 @@ All notable changes to Audit.NET and its extensions will be documented in this f
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [15.1.0] - 2020-04-13
+### Modified
+- Audit.WebApi: Use GetCurrentAuditScope when an HttpContext is missing (#285)
+- Audit.WebApi: Package reference `Microsoft.AspNetCore.Mvc` downgrade for to version 2.1.0 for compatibility with older net core 2.1 framework (#284)
+
+## [15.0.5] - 2020-03-20
+### Modified
+- Audit.EntityFramework: Fix EF events not being audited when calling EF Core's `SaveChangesAsync(bool acceptAllChangesOnSuccess,CancellationToken cancellationToken = default)` overload on the AuditDbContext. (#277)
+
+## [15.0.4] - 2020-02-28
+### Modified
+- Audit.EntityFramework: Fix audit error when auditing multiple types inheriting from the same entity/table (#273)
+
+## [15.0.3] - 2020-02-26
+### Modified
+- Audit.Mvc: Fix audit event saving when an exception occurs on the action method being audited (ASP.NET) (#274)
+
+## [15.0.2] - 2020-01-20
+### Modified
+- Audit.EntityFramework: EntityFrameworkProvider add the possibility to configure the property matching by type, object-wide. (#269)
+
+## [15.0.1] - 2020-01-10
+### Modified
+- Audit.NET.AzureStorage: Change table mapping cache dictionary to be a ConcurrentDictionary (#268)
+
+## [15.0.0] - 2019-12-16
+### Modified
+- Audit.NET: Renaming properties `SerializedOld` and `SerializedNew` to be `Old` and `New` respectively on `AuditTarget` class. (#261)
+- Audit.EntityFramework / Audit.EntityFramework.Core: Adding net472 as target to allow targeting EF CORE 3 from the full .NET Framework. (#263)
+
+## [14.9.1] - 2019-11-30
+### Modified
+- Audit.WebApi / Audit.WebApi.Core: Changing body request/response read to be asynchronous. Avoiding exception when used on asp.net core 3 (System.InvalidOperationException: Synchronous operations are disallowed. Call ReadAsync or set AllowSynchronousIO to true instead) (#259)
+
+## [14.9.0] - 2019-11-29
+### Modified
+- Audit.WebApi / Audit.WebApi.Core: Removing unneeded references (Microsoft.AspNetCore.Identity and Microsoft.Extensions.PlatformAbstractions) (#258)
+
+## [14.8.1] - 2019-11-26
+### Modified
+- Audit.WebApi / Audit.WebApi.Core: Adding execution context getter to AuditApiAction (#257)
+
+## [14.8.0] - 2019-11-20
+### Modified
+- Audit.EntityFramework: Fix 'Property set method not found.' for get-only properties on audit entities (#256)
+- Audit.NET.AzureStorage: Fixed issue with non-concurrent collections (#223, #255)
+
+## [14.7.0] - 2019-10-09
+### Modified
+- Audit.EntityFramework: Adding support for Net Standard >= 2.1 to point to the EntityFramework 6.3.0 library. (#249)
+
+## [14.6.6] - 2019-10-08
+### Modified
+- Audit.NET.Elasticsearch: Updating for Elasticsearch 7 support. NEST library updated to latest release 7.3.1. (#248).
+- Audit.NET.EntityFrameworkCore: Updating Microsoft.EntityFramework.Core library to 3.0.0.
+
 ## [14.6.5] - 2019-09-26
 ### Modified
 - Audit.NET.MongoDB: Updating MongoDB.Driver library to latest release (2.9.1). This fixes problem when using mongo DB data provider in Net Core 3.0 (#246).

@@ -3,22 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using Audit.Core;
 using Audit.Core.Providers;
-using Audit.Core.ConfigurationApi;
 using Audit.Udp.Providers;
 using Audit.MongoDB.Providers;
 using Audit.SqlServer.Providers;
-using Newtonsoft.Json.Linq;
-using Audit.MongoDB.ConfigurationApi;
-using Audit.AzureTableStorage.ConfigurationApi;
 using System.Threading.Tasks;
-using Audit.AzureTableStorage.Providers;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using NUnit.Framework;
-using Audit.AzureDocumentDB.Providers;
-using Audit.AzureDocumentDB.ConfigurationApi;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Audit.DynamoDB.Providers;
@@ -45,27 +37,21 @@ namespace Audit.IntegrationTest
                 Assert.AreEqual("px", x.FilenamePrefix);
                 Assert.AreEqual(DefaultValueHandling.Populate, x.JsonSettings.DefaultValueHandling);
             }
-
+#if NET461 || NETCOREAPP2_0 || NETCORECAPP2_1
             [Test]
             [Category("Elasticsearch")]
             public void Test_ElasticSearchDataProvider_FluentApi()
             {
-#pragma warning disable CS0618 // Type or member is obsolete
                 var x = new Elasticsearch.Providers.ElasticsearchDataProvider(_ => _
                     .ConnectionSettings(new Elasticsearch.Providers.AuditConnectionSettings(new Uri("http://server/")))
                     .Id(ev => "id")
-                    .Index("ix")
-                    .Type(ev => Nest.TypeName.From<int>()));
-#pragma warning restore CS0618 // Type or member is obsolete
+                    .Index("ix"));
 
                 Assert.AreEqual("http://server/", (x.ConnectionSettings.ConnectionPool.Nodes.First().Uri.ToString()));
                 Assert.IsTrue(x.IdBuilder.Invoke(null).Equals(new Nest.Id("id")));
                 Assert.AreEqual("ix", x.IndexBuilder.Invoke(null).Name);
-#pragma warning disable CS0618 // Type or member is obsolete
-                Assert.AreEqual(Nest.TypeName.From<int>(), x.TypeNameBuilder.Invoke(null));
-#pragma warning restore CS0618 // Type or member is obsolete
             }
-
+#endif
             [Test]
             [Category("Mongo")]
             public void Test_MongoDataProvider_FluentApi()
@@ -134,7 +120,7 @@ namespace Audit.IntegrationTest
                     .Schema(ev => "schema")
                     .TableName("table")
                     .CustomColumn("EventType", ev => ev.EventType)
-#if NET452
+#if NET452 || NET461
                     .SetDatabaseInitializerNull()
 #endif
                     );
@@ -145,7 +131,7 @@ namespace Audit.IntegrationTest
                 Assert.AreEqual("last", x.LastUpdatedDateColumnNameBuilder.Invoke(null));
                 Assert.AreEqual("schema", x.SchemaBuilder.Invoke(null));
                 Assert.AreEqual("table", x.TableNameBuilder.Invoke(null));
-#if NET452
+#if NET452 || NET461
                 Assert.AreEqual(true, x.SetDatabaseInitializerNull);
 #endif
             }
@@ -160,10 +146,10 @@ namespace Audit.IntegrationTest
                     .AuditTypeExplicitMapper(cfg => cfg
                         .Map<Blog, AuditBlog>()
                         .Map<Post, AuditPost>())
-                    .IgnoreMatchedProperties(true));
+                    .IgnoreMatchedProperties(t => t == typeof(string)));
 
-
-                Assert.AreEqual(true, x.IgnoreMatchedProperties);
+                Assert.AreEqual(true, x.IgnoreMatchedPropertiesFunc(typeof(string)));
+                Assert.AreEqual(false, x.IgnoreMatchedPropertiesFunc(typeof(int)));
                 Assert.AreEqual(ctx, x.DbContextBuilder.Invoke(null));
                 Assert.AreEqual(typeof(AuditBlog), x.AuditTypeMapper.Invoke(typeof(Blog), null));
                 Assert.AreEqual(typeof(AuditPost), x.AuditTypeMapper.Invoke(typeof(Post), null));
@@ -185,7 +171,7 @@ namespace Audit.IntegrationTest
                     .IgnoreMatchedProperties(true));
 
 
-                Assert.AreEqual(true, x.IgnoreMatchedProperties);
+                Assert.AreEqual(true, x.IgnoreMatchedPropertiesFunc(null));
                 Assert.AreEqual(ctx, x.DbContextBuilder.Invoke(null));
                 Assert.AreEqual(typeof(AuditBlog), x.AuditTypeMapper.Invoke(typeof(Blog), null));
                 Assert.AreEqual(typeof(AuditBlog), x.AuditTypeMapper.Invoke(typeof(Post), null));
@@ -207,7 +193,7 @@ namespace Audit.IntegrationTest
                     .IgnoreMatchedProperties(true));
 
 
-                Assert.AreEqual(true, x.IgnoreMatchedProperties);
+                Assert.AreEqual(true, x.IgnoreMatchedPropertiesFunc(null));
                 Assert.AreEqual(ctx, x.DbContextBuilder.Invoke(null));
                 Assert.AreEqual(typeof(AuditBlog), x.AuditTypeMapper.Invoke(typeof(Blog), null));
                 Assert.AreEqual(typeof(AuditPost), x.AuditTypeMapper.Invoke(typeof(Post), null));
@@ -226,8 +212,7 @@ namespace Audit.IntegrationTest
                         .Map<Post, AuditPost>())
                     .IgnoreMatchedProperties(true));
 
-
-                Assert.AreEqual(true, x.IgnoreMatchedProperties);
+                Assert.AreEqual(true, x.IgnoreMatchedPropertiesFunc(null));
                 Assert.AreEqual(ctx, x.DbContextBuilder.Invoke(null));
                 Assert.AreEqual(typeof(AuditPost), x.AuditTypeMapper.Invoke(typeof(Blog), new EntityFramework.EventEntry() { Action = "Update" }));
                 Assert.AreEqual(typeof(AuditBlog), x.AuditTypeMapper.Invoke(typeof(Blog), new EntityFramework.EventEntry() { Action = "Insert" }));
@@ -235,7 +220,7 @@ namespace Audit.IntegrationTest
                 Assert.AreEqual(null, x.AuditTypeMapper.Invoke(typeof(AuditBlog), null));
             }
 
-#if NET452
+#if NET452 || NET461
             [Test]
             public void Test_StrongName_PublicToken()
             {
@@ -554,6 +539,7 @@ namespace Audit.IntegrationTest
                 TestDelete();
             }
 
+#if NET461 || NETCOREAPP2_0 || NETCORECAPP2_1
             [Test]
             [Category("Elasticsearch")]
             public void TestElasticsearch()
@@ -571,6 +557,7 @@ namespace Audit.IntegrationTest
                 SetElasticsearchSettings();
                 await TestUpdateAsync();
             }
+#endif
 
             [Test]
             [Category("Dynamo")]
@@ -636,13 +623,13 @@ namespace Audit.IntegrationTest
                 Assert.AreEqual(ev.CustomFields["ReferenceId"], evFromApi.CustomFields["ReferenceId"]);
                 if (dpType != "ElasticsearchDataProvider")
                 {
-                    Assert.AreEqual((int)OrderStatus.Created, (int)((dynamic)ev.Target.SerializedOld).Order.Status);
-                    Assert.AreEqual((int)OrderStatus.Submitted, (int)((dynamic)ev.Target.SerializedNew).Order.Status);
+                    Assert.AreEqual((int)OrderStatus.Created, (int)((dynamic)ev.Target.Old).Order.Status);
+                    Assert.AreEqual((int)OrderStatus.Submitted, (int)((dynamic)ev.Target.New).Order.Status);
                 }
                 else
                 {
-                    Assert.AreEqual(OrderStatus.Created, JsonConvert.DeserializeObject<TestStruct>(ev.Target.SerializedOld.ToString()).Order.Status);
-                    Assert.AreEqual(OrderStatus.Submitted, JsonConvert.DeserializeObject<TestStruct>(ev.Target.SerializedNew.ToString()).Order.Status);
+                    Assert.AreEqual(OrderStatus.Created, JsonConvert.DeserializeObject<TestStruct>(ev.Target.Old.ToString()).Order.Status);
+                    Assert.AreEqual(OrderStatus.Submitted, JsonConvert.DeserializeObject<TestStruct>(ev.Target.New.ToString()).Order.Status);
                 }
                 Assert.AreEqual(order.OrderId, ev.CustomFields["ReferenceId"]);
 
@@ -731,13 +718,13 @@ namespace Audit.IntegrationTest
                 Assert.AreEqual(ev.CustomFields["ReferenceId"], evFromApi.CustomFields["ReferenceId"]);
                 if (dpType != "ElasticsearchDataProvider")
                 {
-                    Assert.AreEqual((int)OrderStatus.Created, (int)((dynamic)ev.Target.SerializedOld).Order.Status);
-                    Assert.AreEqual((int)OrderStatus.Submitted, (int)((dynamic)ev.Target.SerializedNew).Order.Status);
+                    Assert.AreEqual((int)OrderStatus.Created, (int)((dynamic)ev.Target.Old).Order.Status);
+                    Assert.AreEqual((int)OrderStatus.Submitted, (int)((dynamic)ev.Target.New).Order.Status);
                 }
                 else
                 {
-                    Assert.AreEqual(OrderStatus.Created, JsonConvert.DeserializeObject<TestStruct>(ev.Target.SerializedOld.ToString()).Order.Status);
-                    Assert.AreEqual(OrderStatus.Submitted, JsonConvert.DeserializeObject<TestStruct>(ev.Target.SerializedNew.ToString()).Order.Status);
+                    Assert.AreEqual(OrderStatus.Created, JsonConvert.DeserializeObject<TestStruct>(ev.Target.Old.ToString()).Order.Status);
+                    Assert.AreEqual(OrderStatus.Submitted, JsonConvert.DeserializeObject<TestStruct>(ev.Target.New.ToString()).Order.Status);
                 }
                 Assert.AreEqual(order.OrderId, ev.CustomFields["ReferenceId"]);
 
@@ -813,7 +800,7 @@ namespace Audit.IntegrationTest
                 Assert.AreEqual(orderId, ev.CustomFields["ReferenceId"]);
             }
 
-#if NET452 || NETCOREAPP2_0 || NETCOREAPP2_1
+#if NET452 || NET461 || NETCOREAPP2_0 || NETCOREAPP2_1
             [Test]
             public void TestEventLog()
             {
@@ -903,7 +890,7 @@ namespace Audit.IntegrationTest
                         .LastUpdatedColumnName("LastUpdatedDate")
                         .CustomColumn("EventType", ev => ev.EventType)
                         .CustomColumn("SomeDate", _ => DateTime.UtcNow)
-#if NET452
+#if NET452 || NET461
                         .SetDatabaseInitializerNull()
 #endif
                         )
@@ -959,12 +946,12 @@ namespace Audit.IntegrationTest
                     .WithCreationPolicy(EventCreationPolicy.InsertOnStartReplaceOnEnd)
                     .ResetActions();
             }
-
+#if NET461 || NETCOREAPP2_0 || NETCORECAPP2_1
             public void SetElasticsearchSettings()
             {
                 var uri = new Uri(AzureSettings.ElasticSearchUrl);
                 var ec = new Nest.ElasticClient(uri);
-                ec.DeleteIndex(Nest.Indices.AllIndices, x => x.Index("auditevent"));
+                ec.Indices.Delete(Nest.Indices.AllIndices, x => x.Index("auditevent"));
 
                 Audit.Core.Configuration.Setup()
                     .UseElasticsearch(config => config
@@ -974,7 +961,7 @@ namespace Audit.IntegrationTest
                     .WithCreationPolicy(EventCreationPolicy.InsertOnStartReplaceOnEnd)
                     .ResetActions();
             }
-
+#endif
             public void SetDynamoSettings()
             {
                 var url = "http://localhost:8000";

@@ -53,7 +53,8 @@ namespace Audit.WebApi
                 ControllerName = actionContext.ActionDescriptor?.ControllerDescriptor?.ControllerName,
                 ActionParameters = GetActionParameters(actionContext.ActionDescriptor, actionContext.ActionArguments, serializeParams),
                 RequestBody = includeRequestBody ? GetRequestBody(contextWrapper) : null,
-                TraceId = request.GetCorrelationId().ToString()
+                TraceId = request.GetCorrelationId().ToString(),
+                HttpActionContext = actionContext
             };
             var eventType = (eventTypeName ?? "{verb} {controller}/{action}").Replace("{verb}", auditAction.HttpMethod)
                 .Replace("{controller}", auditAction.ControllerName)
@@ -212,6 +213,11 @@ namespace Audit.WebApi
 
         internal static AuditScope GetCurrentScope(HttpRequestMessage request, IContextWrapper contextWrapper)
         {
+            if (request == null)
+            {
+                return AuditScopeFactory.CreateNoOp();
+            }
+
             var ctx = contextWrapper ?? new ContextWrapper(request);
             return ctx.Get<AuditScope>(AuditApiHelper.AuditApiScopeKey);
         }

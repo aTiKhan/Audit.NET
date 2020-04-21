@@ -13,6 +13,9 @@ namespace Audit.Core
     /// Makes a code block auditable.
     /// </summary>
     public partial class AuditScope : IDisposable
+#if NETSTANDARD2_1
+        , IAsyncDisposable
+#endif
     {
         private readonly AuditScopeOptions _options;
 #region Constructors
@@ -58,7 +61,7 @@ namespace Audit.Core
                 var targetValue = options.TargetGetter.Invoke();
                 _event.Target = new AuditTarget
                 {
-                    SerializedOld = _dataProvider.Serialize(targetValue),
+                    Old = _dataProvider.Serialize(targetValue),
                     Type = targetValue?.GetType().GetFullTypeName() ?? "Object"
                 };
             }
@@ -129,9 +132,9 @@ namespace Audit.Core
             }
             return this;
         }
-        #endregion
+#endregion
 
-        #region Public Properties
+#region Public Properties
         /// <summary>
         /// The current save mode. Useful on custom actions to determine the saving trigger.
         /// </summary>
@@ -186,7 +189,7 @@ namespace Audit.Core
                 return _creationPolicy;
             }
         }
-        #endregion
+#endregion
 
 #region Private fields
         private SaveMode _saveMode;
@@ -212,7 +215,7 @@ namespace Audit.Core
                 var targetValue = targetGetter.Invoke();
                 _event.Target = new AuditTarget
                 {
-                    SerializedOld = _dataProvider.Serialize(targetValue),
+                    Old = _dataProvider.Serialize(targetValue),
                     Type = targetValue?.GetType().GetFullTypeName() ?? "Object"
                 };
             }
@@ -270,7 +273,11 @@ namespace Audit.Core
         /// Async version of the dispose method
         /// </summary>
         /// <returns></returns>
+#if NETSTANDARD2_1
+        public async ValueTask DisposeAsync()
+#else
         public async Task DisposeAsync()
+#endif
         {
             if (_disposed)
             {
@@ -381,7 +388,7 @@ namespace Audit.Core
             _event.Duration = Convert.ToInt32((_event.EndDate.Value - _event.StartDate).TotalMilliseconds);
             if (_targetGetter != null)
             {
-                _event.Target.SerializedNew = _dataProvider.Serialize(_targetGetter.Invoke());
+                _event.Target.New = _dataProvider.Serialize(_targetGetter.Invoke());
             }
         }
 
@@ -461,6 +468,6 @@ namespace Audit.Core
             // Execute custom after saving actions
             Configuration.InvokeScopeCustomActions(ActionType.OnEventSaved, this);
         }
-        #endregion
+#endregion
     }
 }

@@ -46,9 +46,9 @@ namespace Audit.UnitTest
 
             Assert.AreEqual(1, insertEvs.Count);
             Assert.AreEqual(2, replaceEvs.Count);
-            Assert.AreEqual("x1", insertEvs[0].Target.SerializedOld);
-            Assert.AreEqual("x2", replaceEvs[0].Target.SerializedNew);
-            Assert.AreEqual("x3", replaceEvs[1].Target.SerializedNew);
+            Assert.AreEqual("x1", insertEvs[0].Target.Old);
+            Assert.AreEqual("x2", replaceEvs[0].Target.New);
+            Assert.AreEqual("x3", replaceEvs[1].Target.New);
         }
 
 
@@ -83,8 +83,8 @@ namespace Audit.UnitTest
             Assert.AreEqual(1, fileCount);
             Assert.AreEqual(JsonConvert.SerializeObject(ev), JsonConvert.SerializeObject(fileFromProvider));
             Assert.AreEqual("evt", ev.EventType);
-            Assert.AreEqual("start", ev.Target.SerializedOld);
-            Assert.AreEqual("end", ev.Target.SerializedNew);
+            Assert.AreEqual("start", ev.Target.Old);
+            Assert.AreEqual("end", ev.Target.New);
             Assert.AreEqual("1", ev.CustomFields["X"].ToString());
         }
 
@@ -240,7 +240,7 @@ namespace Audit.UnitTest
             {
                 tasks.Add(Task.Factory.StartNew(async () =>
                 {
-                    await AuditScope.CreateAndSaveAsync("LoginSuccess", new { username = "federico", id = i });
+                    await AuditScope.LogAsync("LoginSuccess", new { username = "federico", id = i });
                     Audit.Core.Configuration.AddCustomAction(ActionType.OnEventSaving, ev =>
                     {
                         //do nothing, just bother
@@ -289,7 +289,7 @@ namespace Audit.UnitTest
             provider.Setup(p => p.Serialize(It.IsAny<string>())).CallBase();
 
             var eventType = "event type";
-            await AuditScope.CreateAndSaveAsync(eventType, new { ExtraField = "extra value" });
+            await AuditScope.LogAsync(eventType, new { ExtraField = "extra value" });
 
             await AuditScope.CreateAndSaveAsync(eventType, new { Extra1 = new { SubExtra1 = "test1" }, Extra2 = "test2" }, provider.Object);
             provider.Verify(p => p.InsertEventAsync(It.IsAny<AuditEvent>()), Times.Once);
@@ -434,6 +434,20 @@ namespace Audit.UnitTest
             provider.Verify(p => p.InsertEvent(It.IsAny<AuditEvent>()), Times.Exactly(1));
         }
 
+#if NETCOREAPP3_0
+        [Test]
+        public async Task Test_Dispose_Async()
+        {
+            var provider = new Mock<AuditDataProvider>();
+
+            await using (var scope = await AuditScope.CreateAsync(null, null, EventCreationPolicy.InsertOnEnd, dataProvider: provider.Object))
+            {               
+            }
+
+            provider.Verify(p => p.InsertEventAsync(It.IsAny<AuditEvent>()), Times.Exactly(1));
+        }
+#endif
+
         [Test]
         public async Task TestDiscard_Async()
         {
@@ -453,7 +467,7 @@ namespace Audit.UnitTest
             }
             Assert.AreEqual(eventType, ev.EventType);
             Assert.True(ev.Comments.Contains("test"));
-            Assert.Null(ev.Target.SerializedNew);
+            Assert.Null(ev.Target.New);
             provider.Verify(p => p.InsertEvent(It.IsAny<AuditEvent>()), Times.Never);
             provider.Verify(p => p.InsertEventAsync(It.IsAny<AuditEvent>()), Times.Never);
         }

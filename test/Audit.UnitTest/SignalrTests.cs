@@ -1,4 +1,4 @@
-﻿#if NET451
+﻿#if NET461
 using NUnit.Framework;
 using System;
 using System.Collections.Concurrent;
@@ -39,7 +39,6 @@ namespace Audit.UnitTest
             };
 
             SimulateConnectReconnectDisconnect(module);
-
             Assert.AreEqual(0, evs.Count);
         }
 

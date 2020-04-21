@@ -77,10 +77,10 @@ namespace Audit.UnitTest
 
             Assert.AreEqual(1, evs.Count);
             Assert.AreEqual("SomeClass", evs[0].Target.Type);
-            Assert.AreEqual(1, (evs[0].Target.SerializedOld as JObject).ToObject<SomeClass>().Id);
-            Assert.AreEqual("Test", (evs[0].Target.SerializedOld as JObject).ToObject<SomeClass>().Name);
-            Assert.AreEqual(2, (evs[0].Target.SerializedNew as JObject).ToObject<SomeClass>().Id);
-            Assert.AreEqual("NewTest", (evs[0].Target.SerializedNew as JObject).ToObject<SomeClass>().Name);
+            Assert.AreEqual(1, (evs[0].Target.Old as JObject).ToObject<SomeClass>().Id);
+            Assert.AreEqual("Test", (evs[0].Target.Old as JObject).ToObject<SomeClass>().Name);
+            Assert.AreEqual(2, (evs[0].Target.New as JObject).ToObject<SomeClass>().Id);
+            Assert.AreEqual("NewTest", (evs[0].Target.New as JObject).ToObject<SomeClass>().Name);
         }
 
         [Test]
@@ -103,8 +103,8 @@ namespace Audit.UnitTest
 
             Assert.AreEqual(1, evs.Count);
             Assert.AreEqual("Object", evs[0].Target.Type);
-            Assert.IsNull(evs[0].Target.SerializedOld);
-            Assert.IsNull(evs[0].Target.SerializedNew);
+            Assert.IsNull(evs[0].Target.Old);
+            Assert.IsNull(evs[0].Target.New);
         }
 
         [Test]
@@ -303,8 +303,8 @@ namespace Audit.UnitTest
             Assert.AreEqual(1, fileCount);
             Assert.AreEqual(JsonConvert.SerializeObject(ev), JsonConvert.SerializeObject(fileFromProvider));
             Assert.AreEqual("evt", ev.EventType);
-            Assert.AreEqual("start", ev.Target.SerializedOld);
-            Assert.AreEqual("end", ev.Target.SerializedNew);
+            Assert.AreEqual("start", ev.Target.Old);
+            Assert.AreEqual("end", ev.Target.New);
             Assert.AreEqual("1", ev.CustomFields["X"].ToString());
         }
 
@@ -460,7 +460,7 @@ namespace Audit.UnitTest
             {
                 tasks.Add(Task.Factory.StartNew(() =>
                 {
-                    AuditScope.CreateAndSave("LoginSuccess", new { username = "federico", id = i });
+                    AuditScope.Log("LoginSuccess", new { username = "federico", id = i });
                     Audit.Core.Configuration.AddCustomAction(ActionType.OnEventSaving, ev =>
                     {
                         //do nothing, just bother
@@ -546,7 +546,7 @@ namespace Audit.UnitTest
             Assert.True(Core.Configuration.AuditScopeActions.ContainsKey(ActionType.OnScopeCreated));
             Assert.AreEqual(1, x);
         }
-#if NET451 || NETCOREAPP2_0
+#if NET461 || NETCOREAPP2_0
         [Test]
         public void Test_FluentConfig_EventLog()
         {
@@ -569,7 +569,7 @@ namespace Audit.UnitTest
             provider.Setup(p => p.Serialize(It.IsAny<string>())).CallBase();
 
             var eventType = "event type";
-            AuditScope.CreateAndSave(eventType, new { ExtraField = "extra value" });
+            AuditScope.Log(eventType, new { ExtraField = "extra value" });
 
             AuditScope.CreateAndSave(eventType, new { Extra1 = new { SubExtra1 = "test1" }, Extra2 = "test2" }, provider.Object);
             provider.Verify(p => p.InsertEvent(It.IsAny<AuditEvent>()), Times.Once);
@@ -729,6 +729,18 @@ namespace Audit.UnitTest
         }
 
         [Test]
+        public void Test_Dispose()
+        {
+            var provider = new Mock<AuditDataProvider>();
+
+            using (var scope = AuditScope.Create(null, null, EventCreationPolicy.InsertOnEnd, provider.Object))
+            {
+            }
+
+            provider.Verify(p => p.InsertEvent(It.IsAny<AuditEvent>()), Times.Exactly(1));
+        }
+
+        [Test]
         public void TestDiscard()
         {
             var provider = new Mock<AuditDataProvider>();
@@ -747,7 +759,7 @@ namespace Audit.UnitTest
             }
             Assert.AreEqual(eventType, ev.EventType);
             Assert.True(ev.Comments.Contains("test"));
-            Assert.Null(ev.Target.SerializedNew);
+            Assert.Null(ev.Target.New);
             provider.Verify(p => p.InsertEvent(It.IsAny<AuditEvent>()), Times.Never);
         }
 

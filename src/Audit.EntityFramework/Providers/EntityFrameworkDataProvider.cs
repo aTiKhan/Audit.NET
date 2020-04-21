@@ -3,10 +3,10 @@ using Audit.Core;
 using System;
 using System.Reflection;
 using System.Threading.Tasks;
-#if NETSTANDARD1_5 || NETSTANDARD2_0 || NETSTANDARD2_1 || NET461
+#if EF_CORE
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
-#elif NET45
+#else
 using System.Data.Entity;
 using System.Data.Entity.Core.Objects;
 #endif
@@ -24,7 +24,7 @@ namespace Audit.EntityFramework.Providers
     /// </remarks>
     public class EntityFrameworkDataProvider : AuditDataProvider
     {
-        private bool _ignoreMatchedProperties;
+        private Func<Type, bool> _ignoreMatchedPropertiesFunc;
         private Func<Type, EventEntry, Type> _auditTypeMapper;
         private Func<AuditEvent, EventEntry, object, bool> _auditEntityAction;
         private Func<AuditEventEntityFramework, DbContext> _dbContextBuilder;
@@ -43,7 +43,7 @@ namespace Audit.EntityFramework.Providers
                 _auditEntityAction = efConfig._auditEntityAction;
                 _auditTypeMapper = efConfig._auditTypeMapper;
                 _dbContextBuilder = efConfig._dbContextBuilder;
-                _ignoreMatchedProperties = efConfig._ignoreMatchedProperties;
+                _ignoreMatchedPropertiesFunc = efConfig._ignoreMatchedPropertiesFunc;
             }
         }
 
@@ -62,11 +62,11 @@ namespace Audit.EntityFramework.Providers
             get { return _auditEntityAction; }
             set { _auditEntityAction = value; }
         }
-
-        public bool IgnoreMatchedProperties
+                
+        public Func<Type, bool> IgnoreMatchedPropertiesFunc
         {
-            get { return _ignoreMatchedProperties; }
-            set { _ignoreMatchedProperties = value; }
+            get { return _ignoreMatchedPropertiesFunc; }
+            set { _ignoreMatchedPropertiesFunc = value; }
         }
 
         /// <summary>
@@ -99,7 +99,7 @@ namespace Audit.EntityFramework.Providers
                         var auditEntity = CreateAuditEntity(type, mappedType, entry);
                         if (_auditEntityAction == null || _auditEntityAction.Invoke(efEvent, entry, auditEntity))
                         {
-#if NET45
+#if EF_FULL
                             auditDbContext.Set(mappedType).Add(auditEntity);
 #else
                             auditDbContext.Add(auditEntity);
@@ -144,7 +144,7 @@ namespace Audit.EntityFramework.Providers
                         var auditEntity = CreateAuditEntity(type, mappedType, entry);
                         if (_auditEntityAction == null || _auditEntityAction.Invoke(efEvent, entry, auditEntity))
                         {
-#if NET45
+#if EF_FULL
                             auditDbContext.Set(mappedType).Add(auditEntity);
 #else
                             await auditDbContext.AddAsync(auditEntity);
@@ -176,7 +176,7 @@ namespace Audit.EntityFramework.Providers
                 entryType = entryType.GetTypeInfo().BaseType;
             }
             Type type;
-#if NETSTANDARD2_0 || NETSTANDARD2_1
+#if EF_CORE && (NETSTANDARD2_0 || NETSTANDARD2_1 || NET472)
             IEntityType definingType = entry.Entry.Metadata.DefiningEntityType ?? localDbContext.Model.FindEntityType(entryType);
                 type = definingType?.ClrType;
 #elif NETSTANDARD1_5 || NET461
@@ -192,10 +192,13 @@ namespace Audit.EntityFramework.Providers
         {
             var entity = entry.Entry.Entity;
             var auditEntity = Activator.CreateInstance(auditType);
-            if (!_ignoreMatchedProperties)
+            if (_ignoreMatchedPropertiesFunc == null || !_ignoreMatchedPropertiesFunc(auditType))
             {
-                var auditFields = auditType.GetTypeInfo().GetProperties(BindingFlags.Public | BindingFlags.Instance).ToDictionary(k => k.Name);
-                var entityFields = definingType.GetTypeInfo().GetProperties(BindingFlags.Public | BindingFlags.Instance);
+                var auditFields = auditType.GetTypeInfo().GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                    .Where(p => p.GetSetMethod() != null)
+                    .ToDictionary(k => k.Name);
+                var entityFields = definingType.GetTypeInfo().GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                    .Where(p => p.GetGetMethod() != null);
                 foreach (var field in entityFields.Where(af => auditFields.ContainsKey(af.Name)))
                 {
                     var value = field.GetValue(entity);

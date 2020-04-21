@@ -61,7 +61,7 @@ namespace Audit.WebApi
             var httpContext = actionContext.HttpContext;
             var actionDescriptor = actionContext.ActionDescriptor as ControllerActionDescriptor;
 
-            var auditAction = CreateOrUpdateAction(actionContext, includeHeaders, includeRequestBody, serializeParams, eventTypeName);
+            var auditAction = await CreateOrUpdateAction(actionContext, includeHeaders, includeRequestBody, serializeParams, eventTypeName);
 
             var eventType = (eventTypeName ?? "{verb} {controller}/{action}").Replace("{verb}", auditAction.HttpMethod)
                 .Replace("{controller}", auditAction.ControllerName)
@@ -77,7 +77,7 @@ namespace Audit.WebApi
             httpContext.Items[AuditApiHelper.AuditApiScopeKey] = auditScope;
         }
 
-        private AuditApiAction CreateOrUpdateAction(ActionExecutingContext actionContext,
+        private async Task<AuditApiAction> CreateOrUpdateAction(ActionExecutingContext actionContext,
             bool includeHeaders, bool includeRequestBody, bool serializeParams, string eventTypeName)
         {
             var httpContext = actionContext.HttpContext;
@@ -95,7 +95,8 @@ namespace Audit.WebApi
                     IpAddress = httpContext.Connection?.RemoteIpAddress?.ToString(),
                     HttpMethod = httpContext.Request.Method,
                     FormVariables = AuditApiHelper.GetFormVariables(httpContext),
-                    TraceId = httpContext.TraceIdentifier
+                    TraceId = httpContext.TraceIdentifier,
+                    ActionExecutingContext = actionContext
                 };
             }
             action.RequestUrl = httpContext.Request.GetDisplayUrl();
@@ -112,12 +113,11 @@ namespace Audit.WebApi
                 {
                     Type = httpContext.Request.ContentType,
                     Length = httpContext.Request.ContentLength,
-                    Value = AuditApiHelper.GetRequestBody(httpContext)
+                    Value = await AuditApiHelper.GetRequestBody(httpContext)
                 };
             }
             return action;
         }
-
 
         /// <summary>
         /// Occurs after the action method is invoked.
@@ -252,6 +252,11 @@ namespace Audit.WebApi
 
         internal static AuditScope GetCurrentScope(HttpContext httpContext)
         {
+            if (httpContext == null)
+            {
+                return AuditScopeFactory.CreateNoOp();
+            }
+
             return httpContext.Items[AuditApiHelper.AuditApiScopeKey] as AuditScope;
         }
 
